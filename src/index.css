@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors;
+  }
+  .btn-primary {
+    @apply btn bg-valorant-red text-white hover:bg-red-600;
+  }
+  .btn-ghost {
+    @apply btn bg-valorant-panel2 text-valorant-accent hover:bg-valorant-panel;
+  }
+  .btn-danger {
+    @apply btn bg-transparent text-red-400 hover:bg-red-500/10 border border-red-500/30;
+  }
+  .input {
+    @apply w-full bg-valorant-panel2 border border-white/5 rounded-md px-3 py-1.5 text-valorant-accent placeholder-valorant-muted focus:outline-none focus:ring-2 focus:ring-valorant-red/50;
+  }
+  .label {
+    @apply block text-xs uppercase tracking-wide text-valorant-muted mb-1;
+  }
+  .card {
+    @apply bg-valorant-panel rounded-lg border border-white/5 p-4;
+  }
+  .table-cell {
+    @apply px-2 py-1.5 text-sm whitespace-nowrap;
+  }
+  .table-head {
+    @apply px-2 py-2 text-xs uppercase tracking-wider text-valorant-muted text-left whitespace-nowrap;
+  }
+}
+
+/* Dual-range slider: two transparent <input type="range"> are stacked so the
+   user can drag either handle. The track is rendered separately. */
+.dual-range {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  pointer-events: none;
+  height: 100%;
+}
+.dual-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 14px;
+  width: 14px;
+  border-radius: 9999px;
+  background: #ff4655; /* valorant-red */
+  border: 2px solid #1a2632; /* valorant-panel */
+  cursor: pointer;
+  pointer-events: auto;
+}
+.dual-range::-moz-range-thumb {
+  height: 14px;
+  width: 14px;
+  border-radius: 9999px;
+  background: #ff4655;
+  border: 2px solid #1a2632;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.dual-range::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 100%;
+}
+.dual-range::-moz-range-track {
+  background: transparent;
+  height: 100%;
+}
+.dual-range:disabled::-webkit-slider-thumb { opacity: 0.4; cursor: not-allowed; }
+.dual-range:disabled::-moz-range-thumb { opacity: 0.4; cursor: not-allowed; }

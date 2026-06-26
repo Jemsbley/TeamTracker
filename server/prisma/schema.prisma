@@ -1,0 +1,122 @@
+// Prisma schema for Team Tracker.
+//
+// Top-level entities (User, Roster, Player, Series, Game) are tables; nested
+// arrays (rounds, stats, pickBan moves, videos, vodReviews) are stored as JSON
+// to keep the API shape aligned with the frontend's existing TypeScript types.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  rosters         Roster[]
+  players         Player[]
+  series          Series[]
+  games           Game[]
+  scoutingReports ScoutingReport[]
+}
+
+model Roster {
+  id        String  @id
+  userId    String
+  name      String
+  notes     String?
+  // At most one roster per user is primary; enforced in the rosters route by
+  // unsetting the others when one is marked primary. Drives default selection
+  // anywhere a roster must be chosen.
+  isPrimary Boolean @default(false)
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  players         Player[]
+  series          Series[]
+  scoutingReports ScoutingReport[]
+
+  @@index([userId])
+}
+
+model Player {
+  id            String  @id
+  userId        String
+  rosterId      String
+  name          String
+  isMainRoster  Boolean
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roster Roster @relation(fields: [rosterId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([rosterId])
+}
+
+model Series {
+  id               String   @id
+  userId           String
+  rosterId         String
+  opponent         String
+  date             String   // ISO yyyy-mm-dd, stored as-is for parity with the client
+  format           String?
+  pickBan          Json?
+  videos           Json?
+  vodReviews       Json?
+  notes            String?
+  // Optional link to a ScoutingReport. Not a DB relation (the report may be
+  // deleted independently); resolved by id on the client.
+  scoutingReportId String?
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roster Roster  @relation(fields: [rosterId], references: [id], onDelete: Cascade)
+  games  Game[]
+
+  @@index([userId])
+  @@index([rosterId])
+}
+
+model ScoutingReport {
+  id       String  @id
+  userId   String
+  teamName String
+  note     String?
+  // Optional owning roster. SetNull so deleting a roster keeps its reports
+  // (just unlinks them) rather than cascading them away.
+  rosterId String?
+  // ScoutMap[]: per-map record (wins/losses), record note, up to 3 agent
+  // compositions, and attack/defense notes. Stored as JSON for parity with
+  // the frontend types, like Series.pickBan/videos.
+  maps     Json?
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roster Roster? @relation(fields: [rosterId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([rosterId])
+}
+
+model Game {
+  id            String  @id
+  userId        String
+  seriesId      String
+  map           String
+  date          String
+  order         Int?
+  scoreFor      Int?
+  scoreAgainst  Int?
+  startingSide  String?
+  rounds        Json?
+  stats         Json    // GameStat[]
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  series Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([seriesId])
+}

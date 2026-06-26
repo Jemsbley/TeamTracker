@@ -1,0 +1,12 @@
+# Railway picks up the Dockerfile automatically; this file just pins the
+# behavior so deploys don't depend on dashboard settings.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "sh -c 'npx prisma migrate deploy && node dist/index.js'"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
