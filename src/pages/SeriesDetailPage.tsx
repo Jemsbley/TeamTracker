@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { parseAsStringEnum, useQueryState } from 'nuqs';
-import { sortSeriesGames, useStore } from '../store';
+import { sortSeriesGames, useStore, canEditSeries } from '../store';
+import WriteButton, { WRITE_TOOLTIP } from '../components/WriteButton';
 import AgentBadge from '../components/AgentBadge';
 import MapIcon from '../components/MapIcon';
 import PickBanCard from '../components/PickBanCard';
@@ -8,6 +10,8 @@ import PlayerStatsTable from '../components/PlayerStatsTable';
 import RoundEconomyPanel from '../components/RoundEconomyPanel';
 import MatchVideosSection from '../components/MatchVideosSection';
 import VodReviewsSection from '../components/VodReviewsSection';
+import TrackerImportModal from '../components/TrackerImportModal';
+import PageHeader from '../components/PageHeader';
 import {
   aggregateEconomy,
   deriveScore,
@@ -45,10 +49,12 @@ export default function SeriesDetailPage() {
   const scoutingReports = useStore((s) => s.scoutingReports);
   const updateSeries = useStore((s) => s.updateSeries);
   const removeGame = useStore((s) => s.removeGame);
+  const canEdit = useStore((s) => canEditSeries(s, seriesId));
   const [compare, setCompare] = useQueryState(
     'cmp',
     parseAsStringEnum<CompareKey>(COMPARE_KEYS).withDefault('average')
   );
+  const [importSlot, setImportSlot] = useState<number | null>(null);
 
   if (!series) {
     return (
@@ -149,68 +155,77 @@ export default function SeriesDetailPage() {
       ? 'Complete the map veto above to populate map slots.'
       : 'No maps yet in this series.';
 
+  const rosterPlayers = players.filter((p) => p.rosterId === series.rosterId);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between gap-3 flex-wrap">
-        <div>
-          <Link to="/series" className="text-xs text-valorant-muted hover:text-valorant-accent">
-            ← All series
-          </Link>
-          <div className="flex items-center gap-2 flex-wrap mt-1">
-            <h2 className="text-xl font-semibold">vs. {series.opponent}</h2>
-            {status.kind === 'won' && (
-              <span className="text-xs uppercase tracking-wider px-2 py-0.5 rounded bg-green-500/20 text-green-200">
-                Series won {status.mapsFor}–{status.mapsAgainst}
-              </span>
-            )}
-            {status.kind === 'lost' && (
-              <span className="text-xs uppercase tracking-wider px-2 py-0.5 rounded bg-red-500/20 text-red-200">
-                Series lost {status.mapsFor}–{status.mapsAgainst}
-              </span>
-            )}
-            {status.kind === 'in_progress' && (
-              <span className="text-xs uppercase tracking-wider px-2 py-0.5 rounded bg-yellow-500/15 text-yellow-200">
-                {status.mapsFor}–{status.mapsAgainst} · first to {status.toWin}
-              </span>
-            )}
-            {linkedReport && (
-              <Link
-                to={`/scouting/${linkedReport.id}`}
-                className="text-xs px-2 py-0.5 rounded bg-valorant-accent/15 text-valorant-accent hover:text-valorant-red"
-              >
-                Scouting: {linkedReport.teamName}
-                {linkedReport.note ? ` (${linkedReport.note})` : ''}
-              </Link>
-            )}
-          </div>
-          {seriesMvpName && (
-            <div className="text-sm text-valorant-muted mt-0.5">
-              Series MVP:{' '}
-              <span className="text-yellow-200 font-medium">
-                {seriesMvpName}
-              </span>{' '}
-              <span className="text-[10px] uppercase tracking-wider px-1 py-0.5 rounded bg-yellow-500/20 text-yellow-200 ml-1">
-                MVP
-              </span>
+      <PageHeader
+        title={`vs. ${series.opponent}`}
+        description={
+          <>
+            <Link to="/series" className="text-xs text-valorant-muted hover:text-valorant-accent">
+              ← All series
+            </Link>
+            <div className="flex items-center gap-2 flex-wrap mt-1">
+              {status.kind === 'won' && (
+                <span className="text-xs uppercase tracking-wider px-2 py-0.5 rounded bg-green-500/20 text-green-200">
+                  Series won {status.mapsFor}–{status.mapsAgainst}
+                </span>
+              )}
+              {status.kind === 'lost' && (
+                <span className="text-xs uppercase tracking-wider px-2 py-0.5 rounded bg-red-500/20 text-red-200">
+                  Series lost {status.mapsFor}–{status.mapsAgainst}
+                </span>
+              )}
+              {status.kind === 'in_progress' && (
+                <span className="text-xs uppercase tracking-wider px-2 py-0.5 rounded bg-yellow-500/15 text-yellow-200">
+                  {status.mapsFor}–{status.mapsAgainst} · first to {status.toWin}
+                </span>
+              )}
+              {linkedReport && (
+                <Link
+                  to={`/scouting/${linkedReport.id}`}
+                  className="text-xs px-2 py-0.5 rounded bg-valorant-accent/15 text-valorant-accent hover:text-valorant-red"
+                >
+                  Scouting: {linkedReport.teamName}
+                  {linkedReport.note ? ` (${linkedReport.note})` : ''}
+                </Link>
+              )}
             </div>
-          )}
-        </div>
+            {seriesMvpName && (
+              <div className="text-sm text-valorant-muted mt-0.5">
+                Series MVP:{' '}
+                <span className="text-yellow-200 font-medium">
+                  {seriesMvpName}
+                </span>{' '}
+                <span className="text-xs uppercase tracking-wider px-1 py-0.5 rounded bg-yellow-500/20 text-yellow-200 ml-1">
+                  MVP
+                </span>
+              </div>
+            )}
+          </>
+        }
+      >
         <div className="flex items-end gap-2">
           <div>
             <label className="label">Format</label>
-            <div className="inline-flex rounded overflow-hidden border border-white/10">
+            <div
+              className="inline-flex rounded overflow-hidden border border-white/10"
+              title={!canEdit ? WRITE_TOOLTIP : undefined}
+            >
               {SERIES_FORMATS.map((f) => (
                 <button
                   key={f}
                   type="button"
+                  disabled={!canEdit}
                   onClick={() =>
                     updateSeries(series.id, { format: f as SeriesFormat })
                   }
-                  className={`px-2.5 py-1.5 text-sm ${
+                  className={`px-2.5 py-1.5 text-sm disabled:cursor-not-allowed ${
                     series.format === f
                       ? 'bg-valorant-red/30 text-white'
                       : 'bg-transparent text-valorant-muted hover:bg-white/5'
-                  }`}
+                  } ${!canEdit ? 'opacity-50' : ''}`}
                 >
                   {f}
                 </button>
@@ -221,16 +236,20 @@ export default function SeriesDetailPage() {
             <label className="label">Series date</label>
             <input
               type="date"
-              className="input"
+              className="input disabled:opacity-50 disabled:cursor-not-allowed"
               value={series.date}
+              disabled={!canEdit}
+              title={!canEdit ? WRITE_TOOLTIP : undefined}
               onChange={(e) => updateSeries(series.id, { date: e.target.value })}
             />
           </div>
           <div>
             <label className="label">Scouting report</label>
             <select
-              className="input"
+              className="input disabled:opacity-50 disabled:cursor-not-allowed"
               value={series.scoutingReportId ?? ''}
+              disabled={!canEdit}
+              title={!canEdit ? WRITE_TOOLTIP : undefined}
               onChange={(e) =>
                 updateSeries(series.id, {
                   scoutingReportId: e.target.value || null,
@@ -247,7 +266,7 @@ export default function SeriesDetailPage() {
             </select>
           </div>
         </div>
-      </div>
+      </PageHeader>
 
       <PickBanCard series={series} />
 
@@ -319,9 +338,11 @@ export default function SeriesDetailPage() {
                 key={`slot-${i}`}
                 index={i}
                 preset={slot.preset}
+                canEdit={canEdit}
                 onFill={() =>
                   navigate(`/series/${series.id}/games/new?slot=${i + 1}`)
                 }
+                onImport={() => setImportSlot(i)}
               />
             ) : (
               <GameSlot
@@ -330,6 +351,7 @@ export default function SeriesDetailPage() {
                 game={slot.game}
                 seriesId={series.id}
                 players={players}
+                canEdit={canEdit}
                 compareEconomy={baselineEconomy}
                 onDelete={() => {
                   if (confirm('Delete this map and its stats?')) {
@@ -344,6 +366,20 @@ export default function SeriesDetailPage() {
 
       <MatchVideosSection series={series} />
       <VodReviewsSection series={series} />
+
+      {importSlot !== null && (
+        <TrackerImportModal
+          players={rosterPlayers}
+          onClose={() => setImportSlot(null)}
+          onImport={(payload) => {
+            const slotIndex = importSlot;
+            setImportSlot(null);
+            navigate(`/series/${series.id}/games/new?slot=${slotIndex + 1}`, {
+              state: { imported: payload },
+            });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -351,11 +387,15 @@ export default function SeriesDetailPage() {
 function PresetSlot({
   index,
   preset,
+  canEdit,
   onFill,
+  onImport,
 }: {
   index: number;
   preset: PlayedMapSummary;
+  canEdit: boolean;
   onFill: () => void;
+  onImport: () => void;
 }) {
   return (
     <div className="card border border-dashed border-white/15 bg-valorant-panel/40 flex items-center gap-4 p-4">
@@ -364,13 +404,13 @@ function PresetSlot({
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs text-valorant-muted">Map {index + 1}</span>
           <h4 className="font-semibold text-lg">{preset.map}</h4>
-          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5 text-valorant-muted">
+          <span className="text-xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5 text-valorant-muted">
             {preset.pickedBy === null ? 'Decider' : 'Pick'}
           </span>
         </div>
         {preset.ourSide && (
           <span
-            className={`inline-block text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${
+            className={`inline-block text-xs uppercase tracking-wider px-1.5 py-0.5 rounded ${
               preset.ourSide === 'Attack'
                 ? 'bg-red-500/15 text-red-300'
                 : 'bg-blue-500/15 text-blue-300'
@@ -380,9 +420,14 @@ function PresetSlot({
           </span>
         )}
       </div>
-      <button className="btn-primary" onClick={onFill}>
-        Fill in stats →
-      </button>
+      <div className="flex flex-col gap-2">
+        <WriteButton canEdit={canEdit} className="btn-primary" onClick={onFill}>
+          Fill in stats →
+        </WriteButton>
+        <WriteButton canEdit={canEdit} className="btn-ghost" onClick={onImport}>
+          Import from tracker.gg
+        </WriteButton>
+      </div>
     </div>
   );
 }
@@ -392,6 +437,7 @@ function GameSlot({
   game,
   seriesId,
   players,
+  canEdit,
   compareEconomy,
   onDelete,
 }: {
@@ -399,6 +445,7 @@ function GameSlot({
   game: Game;
   seriesId: string;
   players: Player[];
+  canEdit: boolean;
   compareEconomy?: RoundEconomy;
   onDelete: () => void;
 }) {
@@ -427,7 +474,7 @@ function GameSlot({
             <h4 className="font-semibold text-lg">{game.map}</h4>
             {game.startingSide && (
               <span
-                className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                className={`text-xs uppercase tracking-wider px-1.5 py-0.5 rounded ${
                   game.startingSide === 'Attack'
                     ? 'bg-red-500/15 text-red-300'
                     : 'bg-blue-500/15 text-blue-300'
@@ -475,12 +522,21 @@ function GameSlot({
           </div>
         </div>
         <div className="flex flex-col gap-2 self-start">
-          <Link className="btn-ghost" to={`/series/${seriesId}/games/${game.id}`}>
-            Edit
-          </Link>
-          <button className="btn-danger" onClick={onDelete}>
+          {canEdit ? (
+            <Link
+              className="btn-ghost"
+              to={`/series/${seriesId}/games/${game.id}`}
+            >
+              Edit
+            </Link>
+          ) : (
+            <WriteButton canEdit={false} className="btn-ghost">
+              Edit
+            </WriteButton>
+          )}
+          <WriteButton canEdit={canEdit} className="btn-danger" onClick={onDelete}>
             Delete
-          </button>
+          </WriteButton>
         </div>
       </div>
       {economy.total > 0 && (

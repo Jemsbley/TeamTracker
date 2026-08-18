@@ -1,77 +1,60 @@
-import { FormEvent, useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
+import nutLogo from '../assets/icons/nut.png';
 import { useAuth } from '../authStore';
 
 export default function LoginPage() {
   const status = useAuth((s) => s.status);
-  const login = useAuth((s) => s.login);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const loginWithGoogle = useAuth((s) => s.loginWithGoogle);
   const [error, setError] = useState<string | null>(null);
   const nav = useNavigate();
 
   if (status === 'authenticated') return <Navigate to="/" replace />;
 
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      await login(email, password);
-      nav('/', { replace: true });
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const clientConfigured = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-valorant-bg">
-      <form
-        onSubmit={onSubmit}
-        className="w-full max-w-sm bg-valorant-panel p-6 rounded-lg border border-white/5 space-y-4"
-      >
-        <h1 className="text-xl font-semibold">Log in</h1>
+      <div className="w-full max-w-sm bg-valorant-panel p-6 rounded-lg border border-white/5 space-y-5 text-center">
+        <img src={nutLogo} alt="Team Tracker" className="h-14 w-14 object-contain mx-auto" />
         <div className="space-y-1">
-          <label className="text-sm text-valorant-muted">Email</label>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-3 py-2 rounded bg-valorant-panel2 border border-white/5"
-            autoComplete="email"
-          />
+          <h1 className="text-xl font-semibold">Team Tracker</h1>
+          <p className="text-sm text-valorant-muted">
+            Sign in with your Google account to continue.
+          </p>
         </div>
-        <div className="space-y-1">
-          <label className="text-sm text-valorant-muted">Password</label>
-          <input
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 rounded bg-valorant-panel2 border border-white/5"
-            autoComplete="current-password"
-          />
-        </div>
+
+        {clientConfigured ? (
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={async (cred) => {
+                setError(null);
+                if (!cred.credential) {
+                  setError('Google did not return a credential. Try again.');
+                  return;
+                }
+                try {
+                  await loginWithGoogle(cred.credential);
+                  nav('/', { replace: true });
+                } catch (err) {
+                  setError((err as Error).message);
+                }
+              }}
+              onError={() => setError('Google sign-in failed. Try again.')}
+              theme="filled_black"
+              shape="pill"
+            />
+          </div>
+        ) : (
+          <p className="text-sm text-red-400">
+            Google sign-in is not configured. Set VITE_GOOGLE_CLIENT_ID and
+            restart the dev server.
+          </p>
+        )}
+
         {error && <p className="text-sm text-red-400">{error}</p>}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full px-3 py-2 rounded bg-valorant-red text-white font-medium disabled:opacity-50"
-        >
-          {submitting ? 'Signing in…' : 'Log in'}
-        </button>
-        <p className="text-sm text-valorant-muted text-center">
-          No account?{' '}
-          <Link to="/signup" className="text-valorant-accent underline">
-            Sign up
-          </Link>
-        </p>
-      </form>
+      </div>
     </div>
   );
 }

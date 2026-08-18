@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useStore } from '../store';
-import { withAllMaps } from '../utils/scouting';
+import { useStore, canEditRoster } from '../store';
+import PageHeader from '../components/PageHeader';
+import WriteButton from '../components/WriteButton';
+import MapIcon from '../components/MapIcon';
+import { favoriteMap, withAllMaps } from '../utils/scouting';
 import { defaultRosterId } from '../utils/rosters';
 
 export default function ScoutingPage() {
@@ -9,6 +12,9 @@ export default function ScoutingPage() {
   const rosters = useStore((s) => s.rosters);
   const addScoutingReport = useStore((s) => s.addScoutingReport);
   const removeScoutingReport = useStore((s) => s.removeScoutingReport);
+  const series = useStore((s) => s.series);
+  const adminViewing = useStore((s) => s.adminViewing);
+  const gate = { rosters, series, adminViewing };
   const navigate = useNavigate();
 
   const [teamName, setTeamName] = useState('');
@@ -25,10 +31,14 @@ export default function ScoutingPage() {
   const rosterName = (id?: string | null) =>
     rosters.find((r) => r.id === id)?.name ?? null;
 
+  // Attaching to a roster requires write access there; unattached (personal)
+  // reports can always be created by their owner.
+  const canCreate = !rosterId || canEditRoster(gate, rosterId);
+
   const onAdd = (e: React.FormEvent) => {
     e.preventDefault();
     const name = teamName.trim();
-    if (!name) return;
+    if (!name || !canCreate) return;
     const report = addScoutingReport({
       teamName: name,
       note: note.trim() || undefined,
@@ -52,15 +62,12 @@ export default function ScoutingPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold">Scouting</h2>
-        <p className="text-sm text-valorant-muted">
-          Build scouting reports on opponents: their map records, the
-          compositions they run, and how they play each map.
-        </p>
-      </div>
-
-      <form onSubmit={onAdd} className="card flex flex-wrap gap-3 items-end">
+      <PageHeader
+        title="Scouting"
+        titleGrow={false}
+        description="Insights on opponents"
+      >
+      <form onSubmit={onAdd} className="flex flex-wrap gap-3 items-end">
         <div className="flex-1 min-w-[220px]">
           <label className="label">Team name</label>
           <input
@@ -96,45 +103,67 @@ export default function ScoutingPage() {
             </select>
           </div>
         )}
-        <button className="btn-primary" type="submit" disabled={!teamName.trim()}>
+        <WriteButton
+          canEdit={canCreate}
+          className="btn-primary"
+          type="submit"
+          disabled={!teamName.trim()}
+        >
           New report
-        </button>
+        </WriteButton>
       </form>
+      </PageHeader>
 
-      {sorted.length === 0 ? (
-        <div className="card text-center text-valorant-muted">
-          No scouting reports yet. Create one above.
-        </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {sorted.map((r) => (
-            <div key={r.id} className="card flex items-start justify-between gap-3">
-              <Link to={`/scouting/${r.id}`} className="min-w-0 flex-1 group">
-                <div className="font-semibold truncate group-hover:text-valorant-red">
-                  {r.teamName}
+      <div className="card space-y-3">
+        <h3 className="font-semibold">Reports</h3>
+        {sorted.length === 0 ? (
+          <div className="text-valorant-muted">
+            No scouting reports yet. Create one above.
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {sorted.map((r) => {
+              const favMap = favoriteMap(r.maps);
+              return (
+                <div
+                  key={r.id}
+                  className="rounded-lg border border-white/10 p-3 flex items-start justify-between gap-3"
+                >
+                  <Link to={`/scouting/${r.id}`} className="min-w-0 flex-1 group">
+                    <div className="font-semibold truncate group-hover:text-valorant-red">
+                      {r.teamName}
+                    </div>
+                    {r.note && (
+                      <div className="text-sm text-valorant-muted truncate">
+                        {r.note}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5 text-xs text-valorant-muted truncate mt-1">
+                      {rosterName(r.rosterId) && <span>{rosterName(r.rosterId)}</span>}
+                      {rosterName(r.rosterId) && r.createdAt && <span>·</span>}
+                      {r.createdAt && <span>{r.createdAt}</span>}
+                    </div>
+                    {favMap && (
+                      <div className="flex items-center gap-1.5 text-xs text-valorant-muted mt-1.5">
+                        <MapIcon map={favMap} width={20} height={20} />
+                        <span>Favorite map: {favMap}</span>
+                      </div>
+                    )}
+                  </Link>
+                  <WriteButton
+                    canEdit={!r.rosterId || canEditRoster(gate, r.rosterId)}
+                    type="button"
+                    className="btn-danger shrink-0"
+                    onClick={() => onDelete(r.id, r.teamName)}
+                  >
+                    Delete
+                  </WriteButton>
                 </div>
-                {r.note && (
-                  <div className="text-sm text-valorant-muted truncate">
-                    {r.note}
-                  </div>
-                )}
-                {rosterName(r.rosterId) && (
-                  <div className="text-xs text-valorant-muted truncate mt-1">
-                    {rosterName(r.rosterId)}
-                  </div>
-                )}
-              </Link>
-              <button
-                type="button"
-                className="btn-danger shrink-0"
-                onClick={() => onDelete(r.id, r.teamName)}
-              >
-                Delete
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

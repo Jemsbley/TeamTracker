@@ -9,6 +9,12 @@ export type StatFilters = {
    * qualifying game only stats whose agent is in the list contribute.
    */
   agents?: string[];
+  /**
+   * Narrows the agent-lineup check above to one player's picks, so a game
+   * qualifies only if THAT player played every listed agent (rather than
+   * anyone on the team). No effect unless `agents` is also set.
+   */
+  playerId?: string;
   seriesId?: string | 'all';
 };
 
@@ -49,7 +55,10 @@ export function gameMatches(g: Game, f: StatFilters): boolean {
   if (f.seriesId && f.seriesId !== 'all' && g.seriesId !== f.seriesId)
     return false;
   if (f.agents && f.agents.length > 0) {
-    const gameAgents = new Set(g.stats.map((s) => s.agent));
+    const relevantStats = f.playerId
+      ? g.stats.filter((s) => s.playerId === f.playerId)
+      : g.stats;
+    const gameAgents = new Set(relevantStats.map((s) => s.agent));
     if (!f.agents.every((a) => gameAgents.has(a))) return false;
   }
   return true;

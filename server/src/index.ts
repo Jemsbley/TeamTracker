@@ -10,7 +10,11 @@ import { seriesRouter } from './routes/series.js';
 import { gamesRouter } from './routes/games.js';
 import { scoutingReportsRouter } from './routes/scoutingReports.js';
 import { meRouter } from './routes/me.js';
+import { membersRouter } from './routes/members.js';
+import { rosterInvitesRouter, invitesRouter } from './routes/invites.js';
+import { adminRouter } from './routes/admin.js';
 import { requireAuth } from './auth.js';
+import { requireAdmin } from './access.js';
 
 const app = express();
 
@@ -34,11 +38,17 @@ app.get('/health', (_req, res) => {
 
 app.use('/auth', authRouter);
 app.use('/me', requireAuth, meRouter);
+// Nested roster sub-resources are mounted before the rosters router so their
+// paths resolve (mergeParams gives them :rosterId).
+app.use('/rosters/:rosterId/members', requireAuth, membersRouter);
+app.use('/rosters/:rosterId/invites', requireAuth, rosterInvitesRouter);
 app.use('/rosters', requireAuth, rostersRouter);
 app.use('/players', requireAuth, playersRouter);
 app.use('/series', requireAuth, seriesRouter);
 app.use('/games', requireAuth, gamesRouter);
 app.use('/scouting-reports', requireAuth, scoutingReportsRouter);
+app.use('/invites', requireAuth, invitesRouter);
+app.use('/admin', requireAuth, requireAdmin, adminRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: `Not found: ${req.method} ${req.path}` });

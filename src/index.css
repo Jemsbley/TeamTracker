@@ -7,7 +7,7 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors;
+    @apply inline-flex items-center justify-center px-3 py-1.5 rounded-md text-sm font-semibold transition-colors;
   }
   .btn-primary {
     @apply btn bg-valorant-red text-white hover:bg-red-600;
@@ -22,16 +22,54 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     @apply w-full bg-valorant-panel2 border border-white/5 rounded-md px-3 py-1.5 text-valorant-accent placeholder-valorant-muted focus:outline-none focus:ring-2 focus:ring-valorant-red/50;
   }
   .label {
-    @apply block text-xs uppercase tracking-wide text-valorant-muted mb-1;
+    @apply block text-xs font-bold uppercase tracking-wide text-white mb-1;
   }
   .card {
     @apply bg-valorant-panel rounded-lg border border-white/5 p-4;
+  }
+  .card h3 {
+    @apply text-base font-semibold;
+  }
+  /* Stats page: cards nested inside the tab shell get a darker, more
+     visible outline than the shell itself so they read as distinct panels. */
+  .stats-shell .card {
+    @apply border-black/40;
   }
   .table-cell {
     @apply px-2 py-1.5 text-sm whitespace-nowrap;
   }
   .table-head {
-    @apply px-2 py-2 text-xs uppercase tracking-wider text-valorant-muted text-left whitespace-nowrap;
+    @apply px-2 py-2 text-xs font-bold uppercase tracking-wider text-white text-left whitespace-nowrap;
+  }
+
+  /* Section sub-heading used to group related stats within a card. */
+  .section-title {
+    @apply text-xs font-bold uppercase tracking-wider text-white mb-2;
+  }
+
+  /*
+   * Shared "stat box" grid: cells auto-fit to the available width instead of
+   * a fixed column count, so a row is never left with one lonely box when
+   * the item count doesn't divide evenly into the breakpoint's columns.
+   */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+    gap: 0.5rem;
+  }
+  .stat-box {
+    @apply bg-valorant-panel2/50 rounded-lg px-3 py-2.5 text-center;
+  }
+  /* The stat's title — kept bolder and brighter than its value so the label
+     reads first, with the number as supporting detail underneath it. */
+  .stat-box-label {
+    @apply text-[11px] font-bold uppercase tracking-wider text-white;
+  }
+  .stat-box-value {
+    @apply text-lg font-semibold tabular-nums mt-0.5 text-valorant-accent/80;
+  }
+  .stat-box-sub {
+    @apply text-[11px] text-valorant-muted mt-0.5;
   }
 }
 
@@ -54,6 +92,11 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
   border: 2px solid #1a2632; /* valorant-panel */
   cursor: pointer;
   pointer-events: auto;
+  /* Webkit positions the thumb using margin-top relative to the (thin,
+     invisible) native track rather than our full-height custom track, so
+     without this it renders high and off-center. Centers a 14px thumb
+     within the 24px-tall track (h-6). */
+  margin-top: 5px;
 }
 .dual-range::-moz-range-thumb {
   height: 14px;

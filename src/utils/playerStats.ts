@@ -1,6 +1,13 @@
 import type { Game, GameStat, ValorantMap } from '../types';
+import { effectiveClutchWon, roundsPlayedIn } from './rounds';
 
-type Entry = { stat: GameStat; map: ValorantMap };
+type Entry = {
+  stat: GameStat;
+  map: ValorantMap;
+  roundsPlayed: number;
+  clutches: number;
+  clutchesWon: number;
+};
 
 export type PlayerAggregate = {
   selections: number;
@@ -14,6 +21,12 @@ export type PlayerAggregate = {
   firstKills: number;
   firstDeaths: number;
   multikills: number;
+  /** % of rounds played where this player got the round's first kill. */
+  firstBloodPercent: number;
+  /** % of rounds played where this player was the round's first death. */
+  firstDeathPercent: number;
+  /** % of this player's marked clutch attempts that were won: won / (won + lost). */
+  clutchPercent: number;
   bestMap: { map: ValorantMap; avgAcs: number; games: number } | null;
 };
 
@@ -36,6 +49,9 @@ const ZERO: PlayerAggregate = {
   firstKills: 0,
   firstDeaths: 0,
   multikills: 0,
+  firstBloodPercent: 0,
+  firstDeathPercent: 0,
+  clutchPercent: 0,
   bestMap: null,
 };
 
@@ -50,6 +66,9 @@ function aggregate(entries: Entry[]): PlayerAggregate {
     );
   const totalKills = sum('kills');
   const totalDeaths = sum('deaths');
+  const totalRoundsPlayed = entries.reduce((a, e) => a + e.roundsPlayed, 0);
+  const totalClutches = entries.reduce((a, e) => a + e.clutches, 0);
+  const totalClutchesWon = entries.reduce((a, e) => a + e.clutchesWon, 0);
   return {
     selections: n,
     acs: sum('acs') / n,
@@ -62,6 +81,9 @@ function aggregate(entries: Entry[]): PlayerAggregate {
     firstKills: sum('firstKills') / n,
     firstDeaths: sum('firstDeaths') / n,
     multikills: sum('multikills') / n,
+    firstBloodPercent: totalRoundsPlayed ? (sum('firstKills') / totalRoundsPlayed) * 100 : 0,
+    firstDeathPercent: totalRoundsPlayed ? (sum('firstDeaths') / totalRoundsPlayed) * 100 : 0,
+    clutchPercent: totalClutches ? (totalClutchesWon / totalClutches) * 100 : 0,
     bestMap: bestMapFor(entries),
   };
 }
@@ -95,7 +117,18 @@ export function computePlayerStats(
     if (mapFilter && g.map !== mapFilter) continue;
     for (const s of g.stats) {
       if (s.playerId !== playerId) continue;
-      entries.push({ stat: s, map: g.map });
+      const clutchRounds = (g.rounds ?? []).filter(
+        (r) => r.clutch === true && r.clutchPlayerId === playerId
+      );
+      const clutches = clutchRounds.length;
+      const clutchesWon = clutchRounds.filter(effectiveClutchWon).length;
+      entries.push({
+        stat: s,
+        map: g.map,
+        roundsPlayed: roundsPlayedIn(g),
+        clutches,
+        clutchesWon,
+      });
     }
   }
 

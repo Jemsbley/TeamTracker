@@ -7,11 +7,14 @@ import {
   useQueryState,
 } from 'nuqs';
 import DateRangePicker from '../components/DateRangePicker';
+import GettingStarted from '../components/GettingStarted';
 import MapPicker from '../components/MapPicker';
 import MultiAgentPicker from '../components/MultiAgentPicker';
+import PageHeader from '../components/PageHeader';
 import { MAPS } from '../constants';
 import { useStore } from '../store';
-import { aggregateTeam, type StatFilters } from '../utils/stats';
+import { ALL_ROSTERS, resolveRosterFilter } from '../utils/rosters';
+import { aggregateTeam, gameMatches, type StatFilters } from '../utils/stats';
 import type { ValorantMap } from '../types';
 import OverallStatsTab from './stats/OverallStatsTab';
 import WinLossStatsTab from './stats/WinLossStatsTab';
@@ -44,10 +47,9 @@ export default function StatsPage() {
 
   // All view state lives in the URL via nuqs, so filters survive reloads and
   // are shareable. Empty/default values are stripped from the query string.
-  const [rosterFilter, setRosterFilter] = useQueryState(
-    'roster',
-    parseAsString.withDefault('')
-  );
+  // Roster filters default to the primary roster rather than "all rosters".
+  const [rosterParam, setRosterParam] = useQueryState('roster', parseAsString);
+  const rosterFilter = resolveRosterFilter(rosterParam, rosters);
   const [mapFilter, setMapFilter] = useQueryState(
     'map',
     parseAsStringEnum<ValorantMap>([...MAPS])
@@ -55,6 +57,12 @@ export default function StatsPage() {
   const [agentFilters, setAgentFilters] = useQueryState(
     'agents',
     parseAsArrayOf(parseAsString).withDefault([])
+  );
+  // Not exposed in the filter bar UI — only ever set via the deep link from
+  // the Players page ("open this player's agent games on the stats page").
+  const [playerFilter, setPlayerFilter] = useQueryState(
+    'player',
+    parseAsString.withDefault('')
   );
   const [seriesFilter, setSeriesFilter] = useQueryState(
     'series',
@@ -72,17 +80,19 @@ export default function StatsPage() {
   const [endDate, setEndDate] = useQueryState('end', parseAsString);
 
   const hasActiveFilters =
-    rosterFilter !== '' ||
+    rosterParam !== null ||
     mapFilter !== null ||
     agentFilters.length > 0 ||
+    playerFilter !== '' ||
     seriesFilter !== '' ||
     startDate !== null ||
     endDate !== null;
 
   const resetFilters = () => {
-    setRosterFilter('');
+    setRosterParam(null);
     setMapFilter(null);
     setAgentFilters([]);
+    setPlayerFilter('');
     setSeriesFilter('');
     setStartDate(null);
     setEndDate(null);
@@ -99,11 +109,12 @@ export default function StatsPage() {
   const filters: StatFilters = {
     map: mapFilter ?? 'all',
     agents: agentFilters,
+    playerId: playerFilter || undefined,
     seriesId: seriesFilter || 'all',
   };
 
   const rosterSeriesIds = useMemo(() => {
-    if (!rosterFilter) return null;
+    if (rosterFilter === ALL_ROSTERS) return null;
     return new Set(
       series.filter((s) => s.rosterId === rosterFilter).map((s) => s.id)
     );
@@ -118,16 +129,16 @@ export default function StatsPage() {
   );
   const rosterScopedSeries = useMemo(
     () =>
-      rosterFilter
-        ? series.filter((s) => s.rosterId === rosterFilter)
-        : series,
+      rosterFilter === ALL_ROSTERS
+        ? series
+        : series.filter((s) => s.rosterId === rosterFilter),
     [series, rosterFilter]
   );
   const rosterScopedPlayers = useMemo(
     () =>
-      rosterFilter
-        ? allPlayers.filter((p) => p.rosterId === rosterFilter)
-        : allPlayers,
+      rosterFilter === ALL_ROSTERS
+        ? allPlayers
+        : allPlayers.filter((p) => p.rosterId === rosterFilter),
     [allPlayers, rosterFilter]
   );
 
@@ -148,42 +159,40 @@ export default function StatsPage() {
     [dateScopedGames, filters]
   );
 
-  const filteredGames = useMemo(() => {
-    return dateScopedGames.filter((g) => {
-      if (mapFilter && g.map !== mapFilter) return false;
-      if (seriesFilter && g.seriesId !== seriesFilter) return false;
-      if (agentFilters.length > 0) {
-        const gameAgents = new Set(g.stats.map((s) => s.agent));
-        if (!agentFilters.every((a) => gameAgents.has(a))) return false;
-      }
-      return true;
-    });
-  }, [dateScopedGames, mapFilter, seriesFilter, agentFilters]);
+  const filteredGames = useMemo(
+    () => dateScopedGames.filter((g) => gameMatches(g, filters)),
+    [dateScopedGames, filters]
+  );
 
   const totalGames = rosterScopedGames.length;
 
+  if (rosters.length === 0 || series.length === 0) {
+    return <GettingStarted hasRoster={rosters.length > 0} />;
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold">Team stats</h2>
-        <p className="text-sm text-valorant-muted">
-          {filteredGames.length} of {totalGames} maps match filters ·{' '}
-          {team.games} player-game entries
-        </p>
-      </div>
-
-      <div className="card relative flex flex-wrap gap-3 items-end">
-        <div>
+      <PageHeader
+        title="Stats"
+        titleGrow={false}
+        description={
+          <>
+            {filteredGames.length} of {totalGames} maps match filters
+          </>
+        }
+      >
+      <div data-grow className="flex flex-wrap gap-3 items-end">
+        <div className="w-32">
           <label className="label">Roster</label>
           <select
-            className="input"
+            className="input truncate"
             value={rosterFilter}
             onChange={(e) => {
-              setRosterFilter(e.target.value);
+              setRosterParam(e.target.value);
               setSeriesFilter('');
             }}
           >
-            <option value="">All rosters</option>
+            <option value={ALL_ROSTERS}>All rosters</option>
             {rosters.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
@@ -191,7 +200,7 @@ export default function StatsPage() {
             ))}
           </select>
         </div>
-        <div>
+        <div className="w-32">
           <label className="label">Map</label>
           <MapPicker
             value={mapFilter ?? ''}
@@ -200,7 +209,7 @@ export default function StatsPage() {
             emptyLabel="All maps"
           />
         </div>
-        <div>
+        <div className="w-44">
           <label className="label">Date range</label>
           <DateRangePicker
             start={startDate}
@@ -211,17 +220,17 @@ export default function StatsPage() {
             }}
           />
         </div>
-        <div>
+        <div className="w-36">
           <label className="label">Agents</label>
           <MultiAgentPicker
             values={agentFilters}
             onChange={setAgentFilters}
           />
         </div>
-        <div>
+        <div className="w-44">
           <label className="label">Series</label>
           <select
-            className="input"
+            className="input truncate"
             value={seriesFilter}
             onChange={(e) => setSeriesFilter(e.target.value)}
           >
@@ -248,76 +257,80 @@ export default function StatsPage() {
           type="button"
           onClick={resetFilters}
           disabled={!hasActiveFilters}
-          className="absolute top-4 right-4 text-sm text-valorant-muted hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+          className="text-sm text-valorant-muted hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Reset filters
         </button>
       </div>
+      </PageHeader>
 
-      <div className="flex flex-wrap gap-1 border-b border-white/10">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              tab === t.key
-                ? 'border-valorant-red text-white'
-                : 'border-transparent text-valorant-muted hover:text-white'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="card stats-shell space-y-4">
+        <div className="flex flex-wrap gap-1 border-b border-white/10">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTab(t.key)}
+              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                tab === t.key
+                  ? 'border-valorant-red text-white'
+                  : 'border-transparent text-valorant-muted hover:text-white'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'overall' && (
+          <OverallStatsTab
+            scopedGames={rosterScopedGames}
+            scopedSeries={rosterScopedSeries}
+            scopedPlayers={rosterScopedPlayers}
+            filteredGames={filteredGames}
+            filters={filters}
+            includeSubs={includeSubs}
+            allSeries={series}
+          />
+        )}
+        {tab === 'wins' && (
+          <WinLossStatsTab
+            scopedGames={rosterScopedGames}
+            scopedSeries={rosterScopedSeries}
+            scopedPlayers={rosterScopedPlayers}
+            filteredGames={filteredGames}
+            filters={filters}
+            includeSubs={includeSubs}
+            outcome="W"
+          />
+        )}
+        {tab === 'losses' && (
+          <WinLossStatsTab
+            scopedGames={rosterScopedGames}
+            scopedSeries={rosterScopedSeries}
+            scopedPlayers={rosterScopedPlayers}
+            filteredGames={filteredGames}
+            filters={filters}
+            includeSubs={includeSubs}
+            outcome="L"
+          />
+        )}
+        {tab === 'examine' && (
+          <ExamineCloserTab
+            scopedGames={rosterScopedGames}
+            scopedSeries={rosterScopedSeries}
+            scopedPlayers={rosterScopedPlayers}
+            filteredGames={filteredGames}
+            filters={filters}
+          />
+        )}
+        {tab === 'progression' && (
+          <ProgressionTab
+            filteredGames={filteredGames}
+            onSelectRange={showRangeInOverall}
+          />
+        )}
       </div>
-
-      {tab === 'overall' && (
-        <OverallStatsTab
-          scopedGames={rosterScopedGames}
-          scopedSeries={rosterScopedSeries}
-          scopedPlayers={rosterScopedPlayers}
-          filteredGames={filteredGames}
-          filters={filters}
-          includeSubs={includeSubs}
-          allSeries={series}
-        />
-      )}
-      {tab === 'wins' && (
-        <WinLossStatsTab
-          scopedGames={rosterScopedGames}
-          scopedSeries={rosterScopedSeries}
-          scopedPlayers={rosterScopedPlayers}
-          filteredGames={filteredGames}
-          filters={filters}
-          includeSubs={includeSubs}
-          outcome="W"
-        />
-      )}
-      {tab === 'losses' && (
-        <WinLossStatsTab
-          scopedGames={rosterScopedGames}
-          scopedSeries={rosterScopedSeries}
-          scopedPlayers={rosterScopedPlayers}
-          filteredGames={filteredGames}
-          filters={filters}
-          includeSubs={includeSubs}
-          outcome="L"
-        />
-      )}
-      {tab === 'examine' && (
-        <ExamineCloserTab
-          scopedGames={rosterScopedGames}
-          scopedSeries={rosterScopedSeries}
-          filteredGames={filteredGames}
-          filters={filters}
-        />
-      )}
-      {tab === 'progression' && (
-        <ProgressionTab
-          filteredGames={filteredGames}
-          onSelectRange={showRangeInOverall}
-        />
-      )}
     </div>
   );
 }

@@ -13,12 +13,18 @@ import ScoutingPage from './pages/ScoutingPage';
 import ScoutingReportPage from './pages/ScoutingReportPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import OnboardingPage from './pages/OnboardingPage';
+import SettingsPage from './pages/SettingsPage';
+import AdminPage from './pages/AdminPage';
+import InvitePage from './pages/InvitePage';
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
+      <Route path="/onboarding" element={<OnboardingPage />} />
+      <Route path="/invite/:token" element={<InvitePage />} />
       <Route element={<AuthGuard />}>
         <Route path="/" element={<Layout />}>
           <Route index element={<StatsPage />} />
@@ -26,6 +32,8 @@ export default function App() {
           <Route path="agents" element={<AgentsPage />} />
           <Route path="players" element={<PlayersPage />} />
           <Route path="roster" element={<RosterPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+          <Route path="admin" element={<AdminPage />} />
           <Route path="scouting" element={<ScoutingPage />} />
           <Route path="scouting/:reportId" element={<ScoutingReportPage />} />
           <Route path="series" element={<SeriesListPage />} />

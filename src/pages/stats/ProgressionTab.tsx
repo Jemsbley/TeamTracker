@@ -24,12 +24,13 @@ const STAT_DEFS: StatDef[] = [
   { key: 'round', label: 'Round win rate', get: (e) => ({ wins: e.totalWins, total: e.total }) },
   { key: 'attackPistol', label: 'Atk Pistol', get: (e) => e.attackPistol },
   { key: 'defensePistol', label: 'Def Pistol', get: (e) => e.defensePistol },
-  { key: 'force', label: 'Antieco', get: (e) => e.force },
+  { key: 'antieco', label: 'Antieco', get: (e) => e.antieco },
   { key: 'bonus', label: 'Bonus', get: (e) => e.bonus },
   { key: 'eco', label: 'Eco', get: (e) => e.eco },
   { key: 'antibonus', label: 'Antibonus', get: (e) => e.antibonus },
   { key: 'gun', label: 'Gun', get: (e) => e.gun },
   { key: 'save', label: 'Save', get: (e) => e.save },
+  { key: 'force', label: 'Force', get: (e) => e.force },
   { key: 'fbRate', label: 'FB rate', get: (e) => ({ wins: e.firstBlood.total, total: e.total }) },
   { key: 'winFb', label: 'Win | FB', get: (e) => e.firstBlood },
   { key: 'winNoFb', label: 'Win | no FB', get: (e) => e.noFirstBlood },
@@ -394,7 +395,7 @@ function ProgressionChart({
               y={y(t)}
               textAnchor="end"
               dominantBaseline="middle"
-              className="fill-valorant-muted text-[10px]"
+              className="fill-valorant-muted text-xs"
             >
               {t}%
             </text>
@@ -426,7 +427,7 @@ function ProgressionChart({
                   x={x(i)}
                   y={margin.top + innerH + 18}
                   textAnchor="middle"
-                  className="fill-valorant-muted text-[10px]"
+                  className="fill-valorant-muted text-xs"
                 >
                   {MONTHS[month]}
                   {showYear ? ` ’${String(year).slice(2)}` : ''}

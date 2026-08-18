@@ -19,17 +19,30 @@ export type Side = 'Attack' | 'Defense';
 
 export type RoundResult = 'W' | 'L';
 
-export type RoundCategoryUser = 'gun' | 'save';
+export type RoundCategoryUser = 'gun' | 'save' | 'force';
 
 export type Round = {
   /** undefined = round not played / not entered yet */
   result?: RoundResult;
   firstBlood?: boolean;
+  /** Which of our players got the first kill this round. Only meaningful when firstBlood is true. */
+  firstBloodPlayerId?: string;
+  /** Which of our players died first this round. Only meaningful when firstBlood is false. */
+  firstDeathPlayerId?: string;
+  /** Did one of our players end up in a marked 1vX clutch this round? */
+  clutch?: boolean;
+  /** Which of our players had the clutch. Only meaningful when clutch is true. */
+  clutchPlayerId?: string;
+  /** Did they win it? Only meaningful when clutch is true. */
+  clutchWon?: boolean;
   /** Was the spike planted this round? (regardless of which side we were on) */
   planted?: boolean;
   /** Only meaningful for rounds 4-12 of each half and OT. Auto-derived otherwise. */
   category?: RoundCategoryUser;
 };
+
+/** Per-roster access level for the current user. */
+export type Role = 'owner' | 'editor' | 'viewer';
 
 export type Roster = {
   id: string;
@@ -37,6 +50,11 @@ export type Roster = {
   notes?: string;
   /** At most one roster is primary; it's preselected wherever a roster is chosen. */
   isPrimary?: boolean;
+  /**
+   * The current user's role on this roster (from /me/state). Undefined in
+   * admin read-only views, where all editing is disabled.
+   */
+  myRole?: Role;
 };
 
 export type Player = {
@@ -45,6 +63,8 @@ export type Player = {
   name: string;
   /** True = part of the starting 5 within this roster. */
   isMainRoster: boolean;
+  /** Real user account linked to this player slot via an accepted invite. */
+  linkedUserId?: string | null;
 };
 
 export type SeriesFormat = 'BO1' | 'BO3' | 'BO5';
@@ -157,6 +177,9 @@ export type ScoutingReport = {
   teamName: string;
   /** Optional label, e.g. "NECC week 4". */
   note?: string;
+  /** ISO yyyy-mm-dd the report was created. Optional since reports made
+   * before this field existed have none. */
+  createdAt?: string;
   /** Optional owning roster; null/undefined means unassigned. */
   rosterId?: string | null;
   /** One entry per map in the game; ordered by record once edited. */

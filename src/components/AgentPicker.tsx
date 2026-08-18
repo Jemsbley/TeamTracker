@@ -112,7 +112,7 @@ export default function AgentPicker({
           <div className="grid grid-cols-4 gap-x-1 gap-y-0.5 p-1">
             {CLASSES.map((cls) => (
               <div key={cls} className="min-w-0">
-                <div className="px-2 pt-1.5 pb-1 text-[10px] uppercase tracking-wider text-valorant-muted">
+                <div className="px-2 pt-1.5 pb-1 text-xs uppercase tracking-wider text-valorant-muted">
                   {CLASS_LABEL[cls]}
                 </div>
                 {AGENTS_BY_CLASS[cls].map((a) => (

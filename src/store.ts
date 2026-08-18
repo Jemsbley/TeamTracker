@@ -33,8 +33,20 @@ type StoreActions = {
   /** Last sync error surfaced to the user (e.g. server rejected an update). */
   syncError: string | null;
 
+  /**
+   * When an admin is viewing another user's data, this holds a label for the
+   * banner. Null in normal (own-data) mode. In this mode the loaded rosters
+   * have no `myRole`, so every edit control is gated off — the view is
+   * read-only.
+   */
+  adminViewing: { userId: string; label: string } | null;
+
   /** Hydrate from the server. Call once after authentication. */
   loadFromServer: () => Promise<void>;
+  /** Load another user's data read-only (admin only). */
+  loadUserStateAsAdmin: (userId: string, label: string) => Promise<void>;
+  /** Leave admin-view mode and reload the admin's own data. */
+  exitAdminView: () => Promise<void>;
   /** Reset the in-memory state (used on logout). */
   clearLocal: () => void;
 
@@ -61,12 +73,20 @@ type StoreActions = {
   removeGame: (id: string) => void;
 
   // Scouting reports
-  addScoutingReport: (r: Omit<ScoutingReport, 'id'>) => ScoutingReport;
+  addScoutingReport: (r: Omit<ScoutingReport, 'id' | 'createdAt'>) => ScoutingReport;
   updateScoutingReport: (
     id: string,
     patch: Partial<Omit<ScoutingReport, 'id'>>
   ) => void;
   removeScoutingReport: (id: string) => void;
+
+  /** Filter for a scoped data clear: unset fields mean "any". */
+  clearAllData: () => void;
+  clearFilteredData: (filter: {
+    rosterId?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => { series: number; reports: number };
 
   resetAll: () => void;
   importState: (s: AppState) => void;
@@ -104,15 +124,27 @@ export const useStore = create<Store>()((set, get) => ({
   hydrated: false,
   pending: 0,
   syncError: null,
+  adminViewing: null,
 
   loadFromServer: async () => {
     const state = await endpoints.me.state();
-    set({ ...state, hydrated: true, syncError: null });
+    set({ ...state, hydrated: true, syncError: null, adminViewing: null });
   },
-  clearLocal: () => set({ ...empty, hydrated: false, pending: 0, syncError: null }),
+  loadUserStateAsAdmin: async (userId, label) => {
+    const { state } = await endpoints.admin.userState(userId);
+    set({ ...state, hydrated: true, syncError: null, adminViewing: { userId, label } });
+  },
+  exitAdminView: async () => {
+    const state = await endpoints.me.state();
+    set({ ...state, hydrated: true, syncError: null, adminViewing: null });
+  },
+  clearLocal: () =>
+    set({ ...empty, hydrated: false, pending: 0, syncError: null, adminViewing: null }),
 
   addRoster: (r) => {
-    const roster: Roster = { id: uid(), ...r };
+    // The creator is always the owner; reflect that locally so edit controls
+    // are enabled before the create round-trip returns.
+    const roster: Roster = { id: uid(), myRole: 'owner', ...r };
     set((s) => ({ rosters: [...s.rosters, roster] }));
     runSync(
       endpoints.rosters.create(roster),
@@ -148,7 +180,9 @@ export const useStore = create<Store>()((set, get) => ({
   },
   removeRoster: (id) => {
     const snapshot = get();
-    if (snapshot.rosters.length <= 1) return;
+    // Mirror the server: don't let the user delete their last owned roster.
+    const owned = snapshot.rosters.filter((r) => r.myRole === 'owner');
+    if (owned.length <= 1 && owned.some((r) => r.id === id)) return;
     const removedSeries = new Set(
       snapshot.series.filter((x) => x.rosterId === id).map((x) => x.id)
     );
@@ -280,7 +314,11 @@ export const useStore = create<Store>()((set, get) => ({
   },
 
   addScoutingReport: (rIn) => {
-    const report: ScoutingReport = { id: uid(), ...rIn };
+    const report: ScoutingReport = {
+      id: uid(),
+      createdAt: new Date().toISOString().slice(0, 10),
+      ...rIn,
+    };
     set((s) => ({ scoutingReports: [...s.scoutingReports, report] }));
     runSync(endpoints.scoutingReports.create(report), () =>
       set((s) => ({
@@ -316,6 +354,82 @@ export const useStore = create<Store>()((set, get) => ({
     });
   },
 
+  clearAllData: () => {
+    const snapshot = get();
+    // Only rosters this user owns — never delete data belonging to a roster
+    // they're just a member of. Deleting a roster cascades its players,
+    // series, games, and scouting reports server-side. This intentionally
+    // wipes down to zero rosters (unlike removeRoster), so it goes through a
+    // dedicated endpoint rather than one DELETE /rosters/:id per roster.
+    const ownedIds = new Set(
+      snapshot.rosters.filter((r) => r.myRole === 'owner').map((r) => r.id)
+    );
+    set((s) => ({
+      rosters: s.rosters.filter((r) => !ownedIds.has(r.id)),
+      players: s.players.filter((p) => !ownedIds.has(p.rosterId)),
+      series: s.series.filter((x) => !ownedIds.has(x.rosterId)),
+      games: s.games.filter((g) => {
+        const series = snapshot.series.find((x) => x.id === g.seriesId);
+        return !series || !ownedIds.has(series.rosterId);
+      }),
+      // Unattached (personal) scouting reports are also wiped server-side;
+      // roster-attached ones are cascaded by their roster's deletion.
+      scoutingReports: s.scoutingReports.filter(
+        (r) => r.rosterId && !ownedIds.has(r.rosterId)
+      ),
+    }));
+    runSync(endpoints.me.clearData(), () =>
+      set(() => ({
+        rosters: snapshot.rosters,
+        players: snapshot.players,
+        series: snapshot.series,
+        games: snapshot.games,
+        scoutingReports: snapshot.scoutingReports,
+      }))
+    );
+  },
+
+  clearFilteredData: (filter) => {
+    const snapshot = get();
+    const dateInRange = (date: string) =>
+      (!filter.startDate || date >= filter.startDate) &&
+      (!filter.endDate || date <= filter.endDate);
+    const seriesToRemove = snapshot.series.filter(
+      (x) =>
+        (!filter.rosterId || x.rosterId === filter.rosterId) &&
+        dateInRange(x.date)
+    );
+    const reportsToRemove = snapshot.scoutingReports.filter(
+      (r) =>
+        (!filter.rosterId || r.rosterId === filter.rosterId) &&
+        (!filter.startDate && !filter.endDate
+          ? true
+          : !!r.createdAt && dateInRange(r.createdAt))
+    );
+    const removedSeriesIds = new Set(seriesToRemove.map((x) => x.id));
+    const removedReportIds = new Set(reportsToRemove.map((r) => r.id));
+    set((s) => ({
+      series: s.series.filter((x) => !removedSeriesIds.has(x.id)),
+      games: s.games.filter((g) => !removedSeriesIds.has(g.seriesId)),
+      scoutingReports: s.scoutingReports.filter(
+        (r) => !removedReportIds.has(r.id)
+      ),
+    }));
+    runSync(
+      Promise.all([
+        ...seriesToRemove.map((x) => endpoints.series.remove(x.id)),
+        ...reportsToRemove.map((r) => endpoints.scoutingReports.remove(r.id)),
+      ]),
+      () =>
+        set(() => ({
+          series: snapshot.series,
+          games: snapshot.games,
+          scoutingReports: snapshot.scoutingReports,
+        }))
+    );
+    return { series: seriesToRemove.length, reports: reportsToRemove.length };
+  },
+
   /**
    * resetAll/importState mutate large amounts of state at once. Rather than
    * sync them client-side (which would require batch endpoints we don't have),
@@ -325,6 +439,31 @@ export const useStore = create<Store>()((set, get) => ({
   resetAll: () => set(() => ({ ...empty, hydrated: true })),
   importState: (next) => set(() => ({ ...empty, ...next, hydrated: true })),
 }));
+
+/** Minimal slice the permission selectors need; full Store satisfies it. */
+export type GateState = Pick<Store, 'rosters' | 'series' | 'adminViewing'>;
+
+/**
+ * Whether the current user may edit data on the given roster. Owners and
+ * editors can; viewers and admin read-only views (myRole undefined) cannot.
+ */
+export function canEditRoster(state: GateState, rosterId: string | undefined): boolean {
+  if (state.adminViewing) return false;
+  const role = state.rosters.find((r) => r.id === rosterId)?.myRole;
+  return role === 'owner' || role === 'editor';
+}
+
+/** Whether the current user owns the roster (for owner-only controls). */
+export function isRosterOwner(state: GateState, rosterId: string | undefined): boolean {
+  if (state.adminViewing) return false;
+  return state.rosters.find((r) => r.id === rosterId)?.myRole === 'owner';
+}
+
+/** Edit-permission for a series, resolved through its roster. */
+export function canEditSeries(state: GateState, seriesId: string | undefined): boolean {
+  const rosterId = state.series.find((s) => s.id === seriesId)?.rosterId;
+  return canEditRoster(state, rosterId);
+}
 
 export function newBlankStat(playerId = '', agent = ''): GameStat {
   return {

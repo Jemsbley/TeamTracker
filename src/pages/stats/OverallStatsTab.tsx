@@ -5,6 +5,7 @@ import PlayerStatsTable from '../../components/PlayerStatsTable';
 import RoundEconomyPanel from '../../components/RoundEconomyPanel';
 import { aggregateEconomy, deriveScore } from '../../utils/rounds';
 import { computePickOutcomes } from '../../utils/mapStats';
+import { gameOutcome, seriesOutcome } from '../../utils/stats';
 import type { Game, Player, Series } from '../../types';
 import type { StatFilters } from '../../utils/stats';
 
@@ -37,6 +38,30 @@ export default function OverallStatsTab({
     [scopedSeries, filteredGames]
   );
 
+  const mapRecord = useMemo(() => {
+    let wins = 0;
+    let losses = 0;
+    for (const g of filteredGames) {
+      const o = gameOutcome(g);
+      if (o === 'W') wins += 1;
+      else if (o === 'L') losses += 1;
+    }
+    return { wins, total: wins + losses };
+  }, [filteredGames]);
+
+  const seriesRecord = useMemo(() => {
+    const matchingSeriesIds = new Set(filteredGames.map((g) => g.seriesId));
+    let wins = 0;
+    let losses = 0;
+    for (const s of scopedSeries) {
+      if (!matchingSeriesIds.has(s.id)) continue;
+      const o = seriesOutcome(s, scopedGames);
+      if (o === 'W') wins += 1;
+      else if (o === 'L') losses += 1;
+    }
+    return { wins, total: wins + losses };
+  }, [scopedSeries, scopedGames, filteredGames]);
+
   if (scopedGames.length === 0) {
     return (
       <div className="card text-center text-valorant-muted space-y-3">
@@ -58,37 +83,53 @@ export default function OverallStatsTab({
 
   return (
     <div className="space-y-6">
+      {(mapRecord.total > 0 || pickTotals > 0) && (
+        <div className="card space-y-2">
+          <h3>Map pick performance</h3>
+          <div className="stat-grid">
+            <PickCell
+              label="Map W%"
+              wins={mapRecord.wins}
+              total={mapRecord.total}
+              tooltip="Overall win rate across matched maps"
+            />
+            <PickCell
+              label="Series W%"
+              wins={seriesRecord.wins}
+              total={seriesRecord.total}
+              tooltip="Overall win rate across matched series"
+            />
+            {pickTotals > 0 && (
+              <>
+                <PickCell
+                  label="Our pick W%"
+                  wins={pickOutcomes.ourPick.wins}
+                  total={pickOutcomes.ourPick.wins + pickOutcomes.ourPick.losses}
+                  tooltip="Win rate on maps we picked"
+                />
+                <PickCell
+                  label="Enemy pick W%"
+                  wins={pickOutcomes.enemyPick.wins}
+                  total={
+                    pickOutcomes.enemyPick.wins + pickOutcomes.enemyPick.losses
+                  }
+                  tooltip="Win rate on maps the opponent picked"
+                />
+                <PickCell
+                  label="Decider W%"
+                  wins={pickOutcomes.decider.wins}
+                  total={pickOutcomes.decider.wins + pickOutcomes.decider.losses}
+                  tooltip="Win rate on the leftover decider map"
+                />
+              </>
+            )}
+          </div>
+        </div>
+      )}
       {economy.total > 0 && (
         <div className="card space-y-2">
           <h3 className="font-semibold">Round economy</h3>
           <RoundEconomyPanel economy={economy} />
-        </div>
-      )}
-      {pickTotals > 0 && (
-        <div className="card space-y-2">
-          <h3 className="font-semibold">Map pick performance</h3>
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <PickCell
-              label="Our pick W%"
-              wins={pickOutcomes.ourPick.wins}
-              total={pickOutcomes.ourPick.wins + pickOutcomes.ourPick.losses}
-              tooltip="Win rate on maps we picked"
-            />
-            <PickCell
-              label="Enemy pick W%"
-              wins={pickOutcomes.enemyPick.wins}
-              total={
-                pickOutcomes.enemyPick.wins + pickOutcomes.enemyPick.losses
-              }
-              tooltip="Win rate on maps the opponent picked"
-            />
-            <PickCell
-              label="Decider W%"
-              wins={pickOutcomes.decider.wins}
-              total={pickOutcomes.decider.wins + pickOutcomes.decider.losses}
-              tooltip="Win rate on the leftover decider map"
-            />
-          </div>
         </div>
       )}
       <PlayerStatsTable
@@ -98,14 +139,6 @@ export default function OverallStatsTab({
         includeSubs={includeSubs}
       />
       <RecentMaps games={filteredGames} series={allSeries} />
-
-      <div className="text-xs text-valorant-muted">
-        <p>
-          KDR uses total kills / total deaths across the filtered set; all other
-          stats are averaged per game played. DDΔ shows the avg per-game damage
-          delta.
-        </p>
-      </div>
     </div>
   );
 }
@@ -191,12 +224,10 @@ function PickCell({
 }) {
   const pct = total === 0 ? '–' : `${((wins / total) * 100).toFixed(0)}%`;
   return (
-    <div className="bg-valorant-panel2/40 rounded p-2" title={tooltip}>
-      <div className="text-[10px] uppercase tracking-wider text-valorant-muted">
-        {label}
-      </div>
-      <div className="text-base font-semibold tabular-nums">{pct}</div>
-      <div className="text-[10px] text-valorant-muted">
+    <div className="stat-box" title={tooltip}>
+      <div className="stat-box-label">{label}</div>
+      <div className="stat-box-value text-xl">{pct}</div>
+      <div className="stat-box-sub">
         {wins}/{total}
       </div>
     </div>

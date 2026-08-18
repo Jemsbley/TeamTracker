@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { MAPS } from '../constants';
-import { useStore } from '../store';
+import { useStore, canEditSeries } from '../store';
+import WriteButton, { WRITE_TOOLTIP } from './WriteButton';
 import type { Series, SeriesFormat, SeriesPickBan, Side, ValorantMap } from '../types';
 import {
   DECIDER_SIDE_TEAM,
@@ -25,6 +26,7 @@ const blankPB = (): SeriesPickBan => ({
 
 export default function PickBanCard({ series }: Props) {
   const updateSeries = useStore((s) => s.updateSeries);
+  const canEdit = useStore((s) => canEditSeries(s, series.id));
   const format = series.format;
   const [collapsed, setCollapsed] = useState(false);
 
@@ -40,6 +42,7 @@ export default function PickBanCard({ series }: Props) {
   const steps = PICKBAN_STEPS[format];
 
   const update = (patch: Partial<SeriesPickBan>) => {
+    if (!canEdit) return;
     updateSeries(series.id, {
       pickBan: { ...blankPB(), ...pb, ...patch },
     });
@@ -70,6 +73,7 @@ export default function PickBanCard({ series }: Props) {
   };
 
   const reset = () => {
+    if (!canEdit) return;
     if (!confirm('Reset the map veto for this series?')) return;
     updateSeries(series.id, { pickBan: undefined });
   };
@@ -109,14 +113,18 @@ export default function PickBanCard({ series }: Props) {
           <span className="text-xs text-valorant-muted">· {statusLabel}</span>
         </button>
         {!collapsed && (pb.pool.length > 0 || pb.moves.length > 0) && (
-          <button type="button" className="btn-danger" onClick={reset}>
+          <WriteButton canEdit={canEdit} type="button" className="btn-danger" onClick={reset}>
             Reset
-          </button>
+          </WriteButton>
         )}
       </div>
 
       {!collapsed && (
-        <>
+        <fieldset
+          disabled={!canEdit}
+          title={!canEdit ? WRITE_TOOLTIP : undefined}
+          className="space-y-5 min-w-0 border-0 p-0 m-0 disabled:opacity-60"
+        >
       {/* Pool */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
@@ -124,7 +132,7 @@ export default function PickBanCard({ series }: Props) {
             Map pool ({pb.pool.length}/{POOL_SIZE})
           </h4>
           {pb.pool.length === POOL_SIZE && (
-            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-green-500/20 text-green-200">
+            <span className="text-xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-green-500/20 text-green-200">
               ready
             </span>
           )}
@@ -147,7 +155,7 @@ export default function PickBanCard({ series }: Props) {
                   {m}
                 </div>
                 {order !== null && (
-                  <div className="absolute top-1 right-1 text-[10px] font-semibold w-4 h-4 rounded-full bg-valorant-red text-white flex items-center justify-center">
+                  <div className="absolute top-1 right-1 text-xs font-semibold w-4 h-4 rounded-full bg-valorant-red text-white flex items-center justify-center">
                     {order}
                   </div>
                 )}
@@ -272,7 +280,7 @@ export default function PickBanCard({ series }: Props) {
                 </div>
                 {m.ourSide && (
                   <span
-                    className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                    className={`text-xs uppercase tracking-wider px-1.5 py-0.5 rounded ${
                       m.ourSide === 'Attack'
                         ? 'bg-red-500/15 text-red-300'
                         : 'bg-blue-500/15 text-blue-300'
@@ -289,7 +297,7 @@ export default function PickBanCard({ series }: Props) {
           )}
         </div>
       )}
-        </>
+        </fieldset>
       )}
     </div>
   );

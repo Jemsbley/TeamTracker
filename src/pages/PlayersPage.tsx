@@ -3,10 +3,13 @@ import { Link } from 'react-router-dom';
 import { parseAsString, parseAsStringEnum, useQueryState } from 'nuqs';
 import AgentIcon from '../components/AgentIcon';
 import DateRangePicker from '../components/DateRangePicker';
+import GettingStarted from '../components/GettingStarted';
 import MapIcon from '../components/MapIcon';
 import MapPicker from '../components/MapPicker';
+import PageHeader from '../components/PageHeader';
 import { MAPS } from '../constants';
 import { useStore } from '../store';
+import { defaultRosterId } from '../utils/rosters';
 import { computePlayerStats, type PlayerAggregate } from '../utils/playerStats';
 import { fmt, fmtPct, fmtSigned } from '../utils/stats';
 import type { ValorantMap } from '../types';
@@ -27,6 +30,9 @@ const STAT_COLUMNS: {
   { key: 'firstKills', label: 'FK', render: (v) => fmt(v, 1) },
   { key: 'firstDeaths', label: 'FD', render: (v) => fmt(v, 1), bestIsLow: true },
   { key: 'multikills', label: 'MK', render: (v) => fmt(v, 1) },
+  { key: 'firstBloodPercent', label: 'FB%', render: (v) => fmtPct(v, 1) },
+  { key: 'firstDeathPercent', label: 'FD%', render: (v) => fmtPct(v, 1), bestIsLow: true },
+  { key: 'clutchPercent', label: 'Clutch%', render: (v) => fmtPct(v, 1) },
 ];
 
 type SortKey = 'agent' | 'selections' | keyof PlayerAggregate | 'bestMap';
@@ -57,10 +63,10 @@ export default function PlayersPage() {
   const [startDate, setStartDate] = useQueryState('start', parseAsString);
   const [endDate, setEndDate] = useQueryState('end', parseAsString);
 
-  // Keep roster valid
+  // Keep roster valid, defaulting to the primary roster.
   useEffect(() => {
     if (!rosters.find((r) => r.id === rosterId)) {
-      setRosterId(rosters[0]?.id ?? '');
+      setRosterId(defaultRosterId(rosters));
     }
   }, [rosters, rosterId]);
 
@@ -165,16 +171,18 @@ export default function PlayersPage() {
 
   const selectedPlayer = rosterPlayers.find((p) => p.id === playerId);
 
+  if (rosters.length === 0 || series.length === 0) {
+    return <GettingStarted hasRoster={rosters.length > 0} />;
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold">Players</h2>
-        <p className="text-sm text-valorant-muted">
-          Per-player breakdown by agent, with optional map filter.
-        </p>
-      </div>
-
-      <div className="card flex flex-wrap gap-3 items-end">
+      <PageHeader
+        title="Players"
+        titleGrow={false}
+        description="Per-player breakdown by agent"
+      >
+      <div className="flex flex-wrap gap-3 items-end">
         <div>
           <label className="label">Roster</label>
           <select
@@ -264,6 +272,7 @@ export default function PlayersPage() {
           </select>
         </div>
       </div>
+      </PageHeader>
 
       {!stats || !selectedPlayer ? (
         <div className="card text-center text-valorant-muted space-y-3">
@@ -318,15 +327,15 @@ export default function PlayersPage() {
               </tr>
             </thead>
             <tbody>
-              <tr className="border-t border-white/10 bg-valorant-panel2/30 font-medium">
-                <td className="table-cell">All</td>
-                <td className="table-cell text-right pr-5 text-valorant-muted">
+              <tr className="border-t border-white/10 bg-valorant-accent/10">
+                <td className="table-cell font-semibold">All</td>
+                <td className="table-cell text-right pr-5 text-valorant-muted font-semibold">
                   —
                 </td>
                 {STAT_COLUMNS.map((c) => (
                   <td
                     key={c.key as string}
-                    className="table-cell text-right pr-5 tabular-nums"
+                    className="table-cell text-right pr-5 tabular-nums font-semibold"
                   >
                     {c.render(stats.total[c.key] as number)}
                   </td>
@@ -338,10 +347,22 @@ export default function PlayersPage() {
               {sortedAgents.map((row) => (
                 <tr key={row.agent} className="border-t border-white/5">
                   <td className="table-cell">
-                    <div className="flex items-center gap-2">
+                    <Link
+                      to={{
+                        pathname: '/',
+                        search: new URLSearchParams({
+                          tab: 'overall',
+                          roster: rosterId,
+                          player: playerId,
+                          agents: row.agent,
+                        }).toString(),
+                      }}
+                      className="flex items-center gap-2 hover:text-valorant-red"
+                      title={`Open team stats filtered to maps where ${selectedPlayer?.name} played ${row.agent}`}
+                    >
                       <AgentIcon agent={row.agent} size={20} />
                       <span className="font-medium">{row.agent}</span>
-                    </div>
+                    </Link>
                   </td>
                   <td className="table-cell text-right pr-5 tabular-nums">
                     {row.selections}
@@ -405,7 +426,7 @@ function SortHeader({
         } ${isActive ? 'text-valorant-accent' : 'hover:text-valorant-accent'}`}
       >
         <span>{label}</span>
-        {arrow && <span className="text-[10px]">{arrow}</span>}
+        {arrow && <span className="text-xs">{arrow}</span>}
       </button>
     </th>
   );
@@ -425,7 +446,7 @@ function BestMapCell({
       <MapIcon map={bestMap.map} width={40} height={22} />
       <div className="text-sm">
         <div className="font-medium">{bestMap.map}</div>
-        <div className="text-[10px] text-valorant-muted tabular-nums">
+        <div className="text-xs text-valorant-muted tabular-nums">
           {bestMap.avgAcs.toFixed(0)} ACS · {bestMap.games}{' '}
           {bestMap.games === 1 ? 'game' : 'games'}
         </div>

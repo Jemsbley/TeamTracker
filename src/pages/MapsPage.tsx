@@ -8,9 +8,12 @@ import {
 } from 'nuqs';
 import AgentIcon from '../components/AgentIcon';
 import DateRangePicker from '../components/DateRangePicker';
+import GettingStarted from '../components/GettingStarted';
 import MapIcon from '../components/MapIcon';
 import MultiAgentPicker from '../components/MultiAgentPicker';
+import PageHeader from '../components/PageHeader';
 import { useStore } from '../store';
+import { ALL_ROSTERS, resolveRosterFilter } from '../utils/rosters';
 import { computeMapAggregates, type MapAggregate } from '../utils/mapStats';
 
 function pct(wins: number, total: number, digits = 0): string {
@@ -97,10 +100,9 @@ export default function MapsPage() {
   const series = useStore((s) => s.series);
   const rosters = useStore((s) => s.rosters);
 
-  const [rosterFilter, setRosterFilter] = useQueryState(
-    'roster',
-    parseAsString.withDefault('')
-  );
+  // Roster filters default to the primary roster rather than "all rosters".
+  const [rosterParam, setRosterParam] = useQueryState('roster', parseAsString);
+  const rosterFilter = resolveRosterFilter(rosterParam, rosters);
   const [agentFilters, setAgentFilters] = useQueryState(
     'agents',
     parseAsArrayOf(parseAsString).withDefault([])
@@ -113,14 +115,14 @@ export default function MapsPage() {
   const [endDate, setEndDate] = useQueryState('end', parseAsString);
 
   const hasActiveFilters =
-    rosterFilter !== '' ||
+    rosterParam !== null ||
     agentFilters.length > 0 ||
     seriesFilter !== '' ||
     startDate !== null ||
     endDate !== null;
 
   const resetFilters = () => {
-    setRosterFilter('');
+    setRosterParam(null);
     setAgentFilters([]);
     setSeriesFilter('');
     setStartDate(null);
@@ -141,9 +143,9 @@ export default function MapsPage() {
   // Series available for the series dropdown (roster-scoped only).
   const rosterScopedSeries = useMemo(
     () =>
-      rosterFilter
-        ? series.filter((s) => s.rosterId === rosterFilter)
-        : series,
+      rosterFilter === ALL_ROSTERS
+        ? series
+        : series.filter((s) => s.rosterId === rosterFilter),
     [series, rosterFilter]
   );
 
@@ -223,28 +225,34 @@ export default function MapsPage() {
 
   const totalGames = scopedGames.length;
 
+  if (rosters.length === 0 || series.length === 0) {
+    return <GettingStarted hasRoster={rosters.length > 0} />;
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold">Maps</h2>
-        <p className="text-sm text-valorant-muted">
-          {totalGames} {totalGames === 1 ? 'map' : 'maps'} played ·{' '}
-          {aggregates.ourPickTotal} our picks
-        </p>
-      </div>
-
-      <div className="card relative flex flex-wrap gap-3 items-end">
+      <PageHeader
+        title="Maps"
+        titleGrow={false}
+        description={
+          <>
+            {totalGames} {totalGames === 1 ? 'map' : 'maps'} played ·{' '}
+            {aggregates.ourPickTotal} our picks
+          </>
+        }
+      >
+      <div data-grow className="flex flex-wrap gap-3 items-end">
         <div>
           <label className="label">Roster</label>
           <select
             className="input"
             value={rosterFilter}
             onChange={(e) => {
-              setRosterFilter(e.target.value);
+              setRosterParam(e.target.value);
               setSeriesFilter('');
             }}
           >
-            <option value="">All rosters</option>
+            <option value={ALL_ROSTERS}>All rosters</option>
             {rosters.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
@@ -288,11 +296,12 @@ export default function MapsPage() {
           type="button"
           onClick={resetFilters}
           disabled={!hasActiveFilters}
-          className="absolute top-4 right-4 text-sm text-valorant-muted hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+          className="ml-auto text-sm text-valorant-muted hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Reset filters
         </button>
       </div>
+      </PageHeader>
 
       {totalGames === 0 ? (
         <div className="card text-center text-valorant-muted space-y-3">
@@ -450,7 +459,7 @@ function SortHeader({
         } ${isActive ? 'text-valorant-accent' : 'hover:text-valorant-accent'}`}
       >
         <span>{label}</span>
-        {arrow && <span className="text-[10px]">{arrow}</span>}
+        {arrow && <span className="text-xs">{arrow}</span>}
       </button>
     </th>
   );
@@ -500,25 +509,25 @@ function MapRow({
       </td>
       <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
         {pct(m.attackRounds.wins, m.attackRounds.total)}{' '}
-        <span className="text-[10px] text-valorant-muted">
+        <span className="text-xs text-valorant-muted">
           ({m.attackRounds.wins}/{m.attackRounds.total})
         </span>
       </td>
       <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
         {pct(m.defenseRounds.wins, m.defenseRounds.total)}{' '}
-        <span className="text-[10px] text-valorant-muted">
+        <span className="text-xs text-valorant-muted">
           ({m.defenseRounds.wins}/{m.defenseRounds.total})
         </span>
       </td>
       <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
         {pct(m.attackPistol.wins, m.attackPistol.total)}{' '}
-        <span className="text-[10px] text-valorant-muted">
+        <span className="text-xs text-valorant-muted">
           ({m.attackPistol.wins}/{m.attackPistol.total})
         </span>
       </td>
       <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
         {pct(m.defensePistol.wins, m.defensePistol.total)}{' '}
-        <span className="text-[10px] text-valorant-muted">
+        <span className="text-xs text-valorant-muted">
           ({m.defensePistol.wins}/{m.defensePistol.total})
         </span>
       </td>

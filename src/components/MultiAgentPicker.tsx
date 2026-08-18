@@ -75,18 +75,18 @@ export default function MultiAgentPicker({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="input flex items-center gap-2 text-left min-w-[12rem]"
+        className="input flex items-center gap-2 text-left"
       >
         {values.length === 0 ? (
-          <span className="text-valorant-muted">{emptyLabel}</span>
+          <span className="text-valorant-muted truncate">{emptyLabel}</span>
         ) : values.length === 1 ? (
           <>
-            <AgentIcon agent={values[0]} size={20} />
-            <span>{values[0]}</span>
+            <AgentIcon agent={values[0]} size={20} className="shrink-0" />
+            <span className="truncate">{values[0]}</span>
           </>
         ) : (
           <>
-            <div className="flex items-center -space-x-1">
+            <div className="flex items-center -space-x-1 shrink-0">
               {values.slice(0, 5).map((a) => (
                 <AgentIcon
                   key={a}
@@ -96,10 +96,10 @@ export default function MultiAgentPicker({
                 />
               ))}
             </div>
-            <span>{values.length} agents</span>
+            <span className="truncate">{values.length} agents</span>
           </>
         )}
-        <span className="ml-auto text-valorant-muted">▾</span>
+        <span className="ml-auto text-valorant-muted shrink-0">▾</span>
       </button>
       {open && (
         <div
@@ -119,7 +119,7 @@ export default function MultiAgentPicker({
           <div className="grid grid-cols-4 gap-x-1 gap-y-0.5 p-1">
             {CLASSES.map((cls) => (
               <div key={cls} className="min-w-0">
-                <div className="px-2 pt-1.5 pb-1 text-[10px] uppercase tracking-wider text-valorant-muted">
+                <div className="px-2 pt-1.5 pb-1 text-xs uppercase tracking-wider text-valorant-muted">
                   {CLASS_LABEL[cls]}
                 </div>
                 {AGENTS_BY_CLASS[cls].map((a) => {
@@ -136,7 +136,7 @@ export default function MultiAgentPicker({
                       <AgentIcon agent={a} size={20} />
                       <span className="truncate flex-1">{a}</span>
                       {selected && (
-                        <span className="text-[10px] text-valorant-red">
+                        <span className="text-xs text-valorant-red">
                           ✓
                         </span>
                       )}

@@ -25,7 +25,7 @@ export default function MapIcon({
   if (!url) {
     return (
       <span
-        className={`inline-flex items-center justify-center ${rounded} bg-white/5 text-[10px] text-valorant-muted ${fillCls} ${className ?? ''}`}
+        className={`inline-flex items-center justify-center ${rounded} bg-white/5 text-xs text-valorant-muted ${fillCls} ${className ?? ''}`}
         style={
           fill
             ? { aspectRatio: '16 / 9', width: '100%' }

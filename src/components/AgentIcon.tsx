@@ -13,7 +13,7 @@ export default function AgentIcon({ agent, size = 20, className, title }: Props)
   if (!url) {
     return (
       <span
-        className={`inline-flex items-center justify-center rounded-sm bg-white/5 text-[10px] text-valorant-muted ${className ?? ''}`}
+        className={`inline-flex items-center justify-center rounded-sm bg-white/5 text-xs text-valorant-muted ${className ?? ''}`}
         style={style}
         title={title ?? agent}
       >

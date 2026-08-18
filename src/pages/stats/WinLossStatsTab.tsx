@@ -215,35 +215,40 @@ export default function WinLossStatsTab({
         </div>
       </div>
 
-      <MetricRankSection title="Percentage stats" metrics={sortedPercent} />
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="w-full lg:w-80 shrink-0">
+          <MetricRankSection title="Percentage stats" metrics={sortedPercent} />
+        </div>
+        <div className="flex-1 min-w-[480px] space-y-6">
+          <div className="space-y-2">
+            <h3 className="font-semibold">Scoreboard</h3>
+            <PlayerStatsTable
+              games={sliceGames}
+              players={scopedPlayers}
+              filters={filters}
+              includeSubs={includeSubs}
+            />
+            <p className="text-xs text-valorant-muted">
+              Team and per-player averages across the {sliceGames.length}{' '}
+              maps in this {outcome === 'W' ? 'wins' : 'losses'} slice.
+            </p>
+          </div>
 
-      <div className="space-y-2">
-        <h3 className="font-semibold">Scoreboard</h3>
-        <PlayerStatsTable
-          games={sliceGames}
-          players={scopedPlayers}
-          filters={filters}
-          includeSubs={includeSubs}
-        />
-        <p className="text-xs text-valorant-muted">
-          Team and per-player averages across the {sliceGames.length} maps in
-          this {outcome === 'W' ? 'wins' : 'losses'} slice.
-        </p>
+          {mode === 'map' ? (
+            <RankedMaps
+              items={rankedItems as { item: Game; agg: Aggregate; avgRank: number }[]}
+              series={scopedSeries}
+              outcome={outcome}
+            />
+          ) : (
+            <RankedSeries
+              items={rankedItems as { item: Series; agg: Aggregate; avgRank: number }[]}
+              scopedGames={scopedGames}
+              outcome={outcome}
+            />
+          )}
+        </div>
       </div>
-
-      {mode === 'map' ? (
-        <RankedMaps
-          items={rankedItems as { item: Game; agg: Aggregate; avgRank: number }[]}
-          series={scopedSeries}
-          outcome={outcome}
-        />
-      ) : (
-        <RankedSeries
-          items={rankedItems as { item: Series; agg: Aggregate; avgRank: number }[]}
-          scopedGames={scopedGames}
-          outcome={outcome}
-        />
-      )}
     </div>
   );
 }
@@ -257,9 +262,9 @@ function MetricRankSection({
 }) {
   if (metrics.length === 0) return null;
   return (
-    <div className="card space-y-2">
-      <h3 className="font-semibold">{title}</h3>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+    <div className="card space-y-2 p-0">
+      <h3 className="font-semibold px-4 pt-4">{title}</h3>
+      <div className="divide-y divide-white/5">
         {metrics.map((m, i) => {
           const delta = m.value - m.baseline;
           const isUp = m.lowerIsBetter ? delta < 0 : delta > 0;
@@ -275,35 +280,36 @@ function MetricRankSection({
           return (
             <div
               key={m.key}
-              className="bg-valorant-panel2/40 rounded p-2"
+              className="flex items-center gap-3 px-4 py-2.5"
               title={`Overall: ${m.format(m.baseline)}`}
             >
-              <div className="flex items-baseline justify-between">
-                <span className="text-[10px] uppercase tracking-wider text-valorant-muted">
-                  #{i + 1} · {m.label}
+              <span className="text-xs text-valorant-muted w-7 shrink-0 tabular-nums">
+                #{i + 1}
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wide text-white flex-1 min-w-0 truncate">
+                {m.label}
+              </span>
+              <span
+                className={`text-xs font-semibold tabular-nums shrink-0 w-16 text-right ${
+                  !deltaTxt
+                    ? 'text-valorant-muted'
+                    : isUp
+                      ? 'text-green-300'
+                      : isDown
+                        ? 'text-red-300'
+                        : 'text-valorant-muted'
+                }`}
+              >
+                {deltaTxt || '—'}
+              </span>
+              <div className="flex flex-col items-end shrink-0 whitespace-nowrap">
+                <span className="text-sm font-semibold tabular-nums text-valorant-accent/80">
+                  {m.format(m.value)}
                 </span>
-                {deltaTxt && (
-                  <span
-                    className={`text-[10px] tabular-nums ${
-                      isUp
-                        ? 'text-green-300'
-                        : isDown
-                          ? 'text-red-300'
-                          : 'text-valorant-muted'
-                    }`}
-                  >
-                    {deltaTxt}
-                  </span>
-                )}
+                <span className="text-[11px] text-valorant-muted tabular-nums">
+                  {m.countLabel || ' '}
+                </span>
               </div>
-              <div className="text-base font-semibold tabular-nums">
-                {m.format(m.value)}
-              </div>
-              {m.countLabel && (
-                <div className="text-[10px] text-valorant-muted tabular-nums">
-                  {m.countLabel}
-                </div>
-              )}
             </div>
           );
         })}
@@ -523,12 +529,13 @@ function buildMetrics({
   const econCells: { key: keyof RoundEconomy; label: string }[] = [
     { key: 'attackPistol', label: 'Atk Pistol W%' },
     { key: 'defensePistol', label: 'Def Pistol W%' },
-    { key: 'force', label: 'Antieco W%' },
+    { key: 'antieco', label: 'Antieco W%' },
     { key: 'bonus', label: 'Bonus W%' },
     { key: 'eco', label: 'Eco W%' },
     { key: 'antibonus', label: 'Antibonus W%' },
     { key: 'gun', label: 'Gun W%' },
     { key: 'save', label: 'Save W%' },
+    { key: 'force', label: 'Force W%' },
     { key: 'firstBlood', label: 'Win | FB' },
     { key: 'noFirstBlood', label: 'Win | no FB' },
   ];

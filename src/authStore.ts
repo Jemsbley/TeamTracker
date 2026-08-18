@@ -1,10 +1,8 @@
 import { create } from 'zustand';
-import { auth, me } from './api/endpoints';
+import { auth, me, type AuthUser } from './api/endpoints';
 import { getToken, setToken } from './api/client';
 
 type Status = 'loading' | 'authenticated' | 'unauthenticated';
-
-type AuthUser = { id: string; email: string };
 
 type AuthState = {
   status: Status;
@@ -13,8 +11,10 @@ type AuthState = {
   error: string | null;
   /** Verify any stored token by fetching /me. Call once on app boot. */
   init: () => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
+  /** Sign in / sign up with a Google ID token credential. */
+  loginWithGoogle: (credential: string) => Promise<void>;
+  /** Replace the cached user (e.g. after updating the username). */
+  setUser: (user: AuthUser) => void;
   logout: () => void;
 };
 
@@ -29,18 +29,26 @@ export const useAuth = create<AuthState>((set) => ({
       return;
     }
     try {
-      const user = await me.get();
-      set({ status: 'authenticated', user: { id: user.id, email: user.email } });
+      const u = await me.get();
+      set({
+        status: 'authenticated',
+        user: {
+          id: u.id,
+          email: u.email,
+          username: u.username,
+          accountType: u.accountType,
+        },
+      });
     } catch {
       setToken(null);
       set({ status: 'unauthenticated', user: null });
     }
   },
 
-  login: async (email, password) => {
+  loginWithGoogle: async (credential) => {
     set({ error: null });
     try {
-      const r = await auth.login(email, password);
+      const r = await auth.google(credential);
       setToken(r.token);
       set({ status: 'authenticated', user: r.user, error: null });
     } catch (e) {
@@ -49,17 +57,7 @@ export const useAuth = create<AuthState>((set) => ({
     }
   },
 
-  signup: async (email, password) => {
-    set({ error: null });
-    try {
-      const r = await auth.signup(email, password);
-      setToken(r.token);
-      set({ status: 'authenticated', user: r.user, error: null });
-    } catch (e) {
-      set({ error: (e as Error).message });
-      throw e;
-    }
-  },
+  setUser: (user) => set({ user }),
 
   logout: () => {
     setToken(null);

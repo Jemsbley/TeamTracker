@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../authStore';
 import { useStore } from '../store';
+import AppHeader from './AppHeader';
+import { RouteSkeleton } from './skeletons';
 
 /**
  * Wraps protected routes. While auth state is unknown, shows a spinner; once
@@ -9,6 +11,7 @@ import { useStore } from '../store';
  */
 export default function AuthGuard() {
   const status = useAuth((s) => s.status);
+  const user = useAuth((s) => s.user);
   const hydrated = useStore((s) => s.hydrated);
   const loadFromServer = useStore((s) => s.loadFromServer);
   const location = useLocation();
@@ -33,10 +36,18 @@ export default function AuthGuard() {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
+  // Authenticated but hasn't chosen a username yet — force onboarding.
+  if (user && !user.username) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
   if (!hydrated) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-valorant-muted">
-        Loading your data…
+      <div className="min-h-full flex flex-col">
+        <AppHeader />
+        <main className="px-4 py-6 w-full flex-1">
+          <RouteSkeleton pathname={location.pathname} />
+        </main>
       </div>
     );
   }

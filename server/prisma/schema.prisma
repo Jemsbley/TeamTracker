@@ -3,6 +3,11 @@
 // Top-level entities (User, Roster, Player, Series, Game) are tables; nested
 // arrays (rounds, stats, pickBan moves, videos, vodReviews) are stored as JSON
 // to keep the API shape aligned with the frontend's existing TypeScript types.
+//
+// Access control: a Roster is shared via RosterMembership rows (owner/editor/
+// viewer). The Roster.userId is the creator (always an owner). On other
+// entities, `userId` is now only a "createdBy" audit field — authorization is
+// derived from roster membership, not from this column.
 
 generator client {
   provider = "prisma-client-js"
@@ -16,7 +21,17 @@ datasource db {
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
-  passwordHash String
+  // Legacy: unused under Google-only sign-in. Kept nullable so existing rows
+  // (with a hash) and new Google accounts (without one) both validate.
+  passwordHash String?
+  // Google "sub" claim, set on first Google sign-in. Accounts are matched by
+  // email, then this is recorded for reference.
+  googleId     String?  @unique
+  // Chosen display name. NOT unique. Null until the user completes onboarding.
+  username     String?
+  // Platform role: 'user' | 'admin' | 'test'. Gates the mock-data button
+  // (test) and the admin panel (admin).
+  accountType  String   @default("user")
   createdAt    DateTime @default(now())
 
   rosters         Roster[]
@@ -24,34 +39,75 @@ model User {
   series          Series[]
   games           Game[]
   scoutingReports ScoutingReport[]
+  memberships     RosterMembership[]
 }
 
 model Roster {
-  id        String  @id
-  userId    String
-  name      String
-  notes     String?
-  // At most one roster per user is primary; enforced in the rosters route by
-  // unsetting the others when one is marked primary. Drives default selection
-  // anywhere a roster must be chosen.
-  isPrimary Boolean @default(false)
+  id     String  @id
+  // Creator of the roster — always holds an 'owner' membership. Deleting the
+  // creator cascades the roster (the creator owns it).
+  userId String
+  name   String
+  notes  String?
 
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   players         Player[]
   series          Series[]
   scoutingReports ScoutingReport[]
+  memberships     RosterMembership[]
+  invites         RosterInvite[]
 
   @@index([userId])
 }
 
-model Player {
-  id            String  @id
-  userId        String
-  rosterId      String
-  name          String
-  isMainRoster  Boolean
+// Per-(roster, user) access grant. The creator is seeded as 'owner'; invited
+// users start 'viewer' and may be promoted to 'editor'. `isPrimary` is a
+// per-user preference (which roster is selected by default), so it lives here
+// rather than on the shared Roster row.
+model RosterMembership {
+  rosterId  String
+  userId    String
+  role      String   @default("viewer") // 'owner' | 'editor' | 'viewer'
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
 
+  roster Roster @relation(fields: [rosterId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([rosterId, userId])
+  @@index([userId])
+  @@index([rosterId])
+}
+
+// A shareable invite link tied to a specific player slot on a roster. Accepting
+// it grants the invitee a membership and links their account to the player.
+model RosterInvite {
+  id         String   @id @default(cuid())
+  token      String   @unique
+  rosterId   String
+  playerId   String
+  role       String   @default("viewer")
+  createdBy  String
+  acceptedBy String?
+  createdAt  DateTime @default(now())
+
+  roster Roster @relation(fields: [rosterId], references: [id], onDelete: Cascade)
+
+  @@index([rosterId])
+}
+
+model Player {
+  id           String  @id
+  // createdBy audit field (nullable; SetNull so a teammate deleting their
+  // account doesn't remove players in someone else's roster).
+  userId       String?
+  rosterId     String
+  name         String
+  isMainRoster Boolean
+  // Real user account connected to this player slot via an accepted invite.
+  linkedUserId String?
+
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
   roster Roster @relation(fields: [rosterId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -59,11 +115,11 @@ model Player {
 }
 
 model Series {
-  id               String   @id
-  userId           String
+  id               String  @id
+  userId           String?
   rosterId         String
   opponent         String
-  date             String   // ISO yyyy-mm-dd, stored as-is for parity with the client
+  date             String // ISO yyyy-mm-dd, stored as-is for parity with the client
   format           String?
   pickBan          Json?
   videos           Json?
@@ -73,8 +129,8 @@ model Series {
   // deleted independently); resolved by id on the client.
   scoutingReportId String?
 
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  roster Roster  @relation(fields: [rosterId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  roster Roster @relation(fields: [rosterId], references: [id], onDelete: Cascade)
   games  Game[]
 
   @@index([userId])
@@ -82,19 +138,22 @@ model Series {
 }
 
 model ScoutingReport {
-  id       String  @id
-  userId   String
-  teamName String
-  note     String?
+  id        String  @id
+  userId    String?
+  teamName  String
+  note      String?
+  // ISO yyyy-mm-dd, stored as-is for parity with the client. Optional since
+  // reports created before this field existed have none.
+  createdAt String?
   // Optional owning roster. SetNull so deleting a roster keeps its reports
   // (just unlinks them) rather than cascading them away.
-  rosterId String?
+  rosterId  String?
   // ScoutMap[]: per-map record (wins/losses), record note, up to 3 agent
   // compositions, and attack/defense notes. Stored as JSON for parity with
   // the frontend types, like Series.pickBan/videos.
-  maps     Json?
+  maps      Json?
 
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
   roster Roster? @relation(fields: [rosterId], references: [id], onDelete: SetNull)
 
   @@index([userId])
@@ -102,19 +161,19 @@ model ScoutingReport {
 }
 
 model Game {
-  id            String  @id
-  userId        String
-  seriesId      String
-  map           String
-  date          String
-  order         Int?
-  scoreFor      Int?
-  scoreAgainst  Int?
-  startingSide  String?
-  rounds        Json?
-  stats         Json    // GameStat[]
+  id           String  @id
+  userId       String?
+  seriesId     String
+  map          String
+  date         String
+  order        Int?
+  scoreFor     Int?
+  scoreAgainst Int?
+  startingSide String?
+  rounds       Json?
+  stats        Json // GameStat[]
 
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
   series Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
 
   @@index([userId])

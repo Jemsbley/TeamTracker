@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { parseAsString, useQueryState } from 'nuqs';
-import { useStore } from '../store';
+import { useStore, canEditRoster, isRosterOwner } from '../store';
+import { useAuth } from '../authStore';
 import { generateMockSeries } from '../utils/mockSeed';
 import { defaultRosterId } from '../utils/rosters';
+import PageHeader from '../components/PageHeader';
+import RosterSharing from '../components/RosterSharing';
+import WriteButton, { WRITE_TOOLTIP } from '../components/WriteButton';
 
 export default function RosterPage() {
   const rosters = useStore((s) => s.rosters);
@@ -15,7 +19,6 @@ export default function RosterPage() {
   const addPlayer = useStore((s) => s.addPlayer);
   const updatePlayer = useStore((s) => s.updatePlayer);
   const removePlayer = useStore((s) => s.removePlayer);
-  const resetAll = useStore((s) => s.resetAll);
 
   const [activeRosterId, setActiveRosterId] = useQueryState(
     'roster',
@@ -32,6 +35,10 @@ export default function RosterPage() {
     }
   }, [rosters, activeRosterId]);
 
+  const accountType = useAuth((s) => s.user?.accountType);
+  const canEdit = useStore((s) => canEditRoster(s, activeRosterId ?? undefined));
+  const isOwner = useStore((s) => isRosterOwner(s, activeRosterId ?? undefined));
+
   const activeRoster = rosters.find((r) => r.id === activeRosterId) ?? null;
   const rosterPlayers = activeRoster
     ? players.filter((p) => p.rosterId === activeRoster.id)
@@ -45,7 +52,7 @@ export default function RosterPage() {
   const [isMain, setIsMain] = useState(true);
   const onAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeRoster) return;
+    if (!activeRoster || !canEdit) return;
     const trimmed = name.trim();
     if (!trimmed) return;
     addPlayer({
@@ -89,15 +96,49 @@ export default function RosterPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between gap-3 flex-wrap">
-        <div>
-          <h2 className="text-xl font-semibold">Rosters</h2>
-          <p className="text-sm text-valorant-muted">
+      <PageHeader
+        title="Rosters"
+        titleGrow={false}
+        description={
+          <>
             {rosters.length} roster{rosters.length === 1 ? '' : 's'} ·{' '}
             {players.length} player{players.length === 1 ? '' : 's'} total
-          </p>
+          </>
+        }
+      >
+        <div data-grow className="flex flex-wrap items-center gap-1.5">
+          {rosters.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => setActiveRosterId(r.id)}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeRoster?.id === r.id
+                  ? 'bg-valorant-red text-white'
+                  : 'bg-valorant-panel2 text-valorant-accent hover:bg-valorant-panel'
+              }`}
+            >
+              {r.isPrimary && (
+                <span
+                  className="mr-1"
+                  title="Primary roster"
+                  aria-label="Primary roster"
+                >
+                  ★
+                </span>
+              )}
+              {r.name}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={onAddRoster}
+            className="px-3 py-1.5 rounded-md text-sm border border-dashed border-white/15 text-valorant-muted hover:bg-white/5"
+          >
+            + New roster
+          </button>
         </div>
-        <div className="flex gap-2">
+        {accountType === 'test' && (
           <button
             type="button"
             className="btn-ghost"
@@ -121,141 +162,96 @@ export default function RosterPage() {
           >
             Generate mock data
           </button>
-          <button
-            type="button"
-            className="btn-danger"
-            onClick={() => {
-              const summary = `${rosters.length} roster(s), ${players.length} player(s), and ${series.length} series (with all stats)`;
-              if (
-                !confirm(
-                  `This will permanently delete EVERYTHING: ${summary}.\n\nAre you sure?`
-                )
-              )
-                return;
-              const typed = prompt(
-                'Type DELETE in all caps to confirm:'
-              );
-              if (typed !== 'DELETE') {
-                alert('Cancelled.');
-                return;
-              }
-              resetAll();
-              setActiveRosterId(null);
-            }}
-          >
-            Clear all data
-          </button>
-        </div>
-      </div>
-
-      {/* Roster tabs */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {rosters.map((r) => (
-          <button
-            key={r.id}
-            type="button"
-            onClick={() => setActiveRosterId(r.id)}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              activeRoster?.id === r.id
-                ? 'bg-valorant-red text-white'
-                : 'bg-valorant-panel2 text-valorant-accent hover:bg-valorant-panel'
-            }`}
-          >
-            {r.isPrimary && (
-              <span
-                className="mr-1"
-                title="Primary roster"
-                aria-label="Primary roster"
-              >
-                ★
-              </span>
-            )}
-            {r.name}
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={onAddRoster}
-          className="px-3 py-1.5 rounded-md text-sm border border-dashed border-white/15 text-valorant-muted hover:bg-white/5"
-        >
-          + New roster
-        </button>
-      </div>
+        )}
+      </PageHeader>
 
       {activeRoster && (
         <>
-          <div className="card flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <div className="font-semibold text-lg flex items-center gap-2">
-                {activeRoster.name}
-                {activeRoster.isPrimary && (
-                  <span className="text-xs font-medium rounded-full bg-valorant-red/20 text-valorant-red px-2 py-0.5">
-                    ★ Primary
-                  </span>
-                )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="card flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <div className="font-semibold text-lg flex items-center gap-2">
+                  {activeRoster.name}
+                  {activeRoster.isPrimary && (
+                    <span className="text-xs font-medium rounded-full bg-valorant-red/20 text-valorant-red px-2 py-0.5">
+                      ★ Primary
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-valorant-muted">
+                  {mainCount} main · {rosterPlayers.length - mainCount} sub ·{' '}
+                  {seriesCount} series
+                </div>
               </div>
-              <div className="text-xs text-valorant-muted">
-                {mainCount} main · {rosterPlayers.length - mainCount} sub ·{' '}
-                {seriesCount} series
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => setPrimaryRoster(activeRoster.id)}
+                  disabled={activeRoster.isPrimary}
+                  title={
+                    activeRoster.isPrimary
+                      ? 'This is already your primary roster'
+                      : 'Preselect this roster everywhere a roster is chosen'
+                  }
+                >
+                  {activeRoster.isPrimary ? '★ Primary' : 'Set as primary'}
+                </button>
+                <WriteButton
+                  canEdit={canEdit}
+                  type="button"
+                  className="btn-ghost"
+                  onClick={onRenameRoster}
+                >
+                  Rename
+                </WriteButton>
+                <WriteButton
+                  canEdit={isOwner}
+                  type="button"
+                  className="btn-danger"
+                  onClick={onDeleteRoster}
+                >
+                  Delete roster
+                </WriteButton>
               </div>
             </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => setPrimaryRoster(activeRoster.id)}
-                disabled={activeRoster.isPrimary}
-                title={
-                  activeRoster.isPrimary
-                    ? 'This is already your primary roster'
-                    : 'Preselect this roster everywhere a roster is chosen'
-                }
-              >
-                {activeRoster.isPrimary ? '★ Primary' : 'Set as primary'}
-              </button>
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={onRenameRoster}
-              >
-                Rename
-              </button>
-              <button
-                type="button"
-                className="btn-danger"
-                onClick={onDeleteRoster}
-                disabled={rosters.length <= 1}
-              >
-                Delete roster
-              </button>
-            </div>
+
+            <form onSubmit={onAdd} className="card flex flex-wrap gap-3 items-end">
+              <div className="flex-1 min-w-[200px]">
+                <label className="label">Player name</label>
+                <input
+                  className="input disabled:opacity-50 disabled:cursor-not-allowed"
+                  value={name}
+                  disabled={!canEdit}
+                  title={!canEdit ? WRITE_TOOLTIP : undefined}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Phantom"
+                />
+              </div>
+              <div>
+                <label className="label">Roster slot</label>
+                <select
+                  className="input disabled:opacity-50 disabled:cursor-not-allowed"
+                  value={isMain ? 'main' : 'sub'}
+                  disabled={!canEdit}
+                  onChange={(e) => setIsMain(e.target.value === 'main')}
+                >
+                  <option value="main">Main (starting 5)</option>
+                  <option value="sub">Substitute</option>
+                </select>
+              </div>
+              <WriteButton canEdit={canEdit} type="submit" className="btn-primary">
+                Add player
+              </WriteButton>
+            </form>
           </div>
 
-          <form onSubmit={onAdd} className="card flex flex-wrap gap-3 items-end">
-            <div className="flex-1 min-w-[200px]">
-              <label className="label">Player name</label>
-              <input
-                className="input"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Phantom"
-              />
+          {!canEdit && (
+            <div className="card text-sm text-valorant-muted">
+              You have view-only access to this roster. Ask the roster owner for
+              edit permission to make changes.
             </div>
-            <div>
-              <label className="label">Roster slot</label>
-              <select
-                className="input"
-                value={isMain ? 'main' : 'sub'}
-                onChange={(e) => setIsMain(e.target.value === 'main')}
-              >
-                <option value="main">Main (starting 5)</option>
-                <option value="sub">Substitute</option>
-              </select>
-            </div>
-            <button type="submit" className="btn-primary">
-              Add player
-            </button>
-          </form>
+          )}
 
           <div className="card overflow-hidden p-0">
             <table className="w-full">
@@ -281,8 +277,9 @@ export default function RosterPage() {
                   <tr key={p.id} className="border-t border-white/5">
                     <td className="table-cell">
                       <input
-                        className="input bg-transparent border-transparent hover:border-white/10 focus:border-white/10"
+                        className="input bg-transparent border-transparent hover:border-white/10 focus:border-white/10 disabled:hover:border-transparent"
                         value={p.name}
+                        disabled={!canEdit}
                         onChange={(e) =>
                           updatePlayer(p.id, { name: e.target.value })
                         }
@@ -290,8 +287,9 @@ export default function RosterPage() {
                     </td>
                     <td className="table-cell">
                       <select
-                        className="input bg-transparent border-transparent hover:border-white/10 focus:border-white/10 w-auto"
+                        className="input bg-transparent border-transparent hover:border-white/10 focus:border-white/10 w-auto disabled:hover:border-transparent"
                         value={p.isMainRoster ? 'main' : 'sub'}
+                        disabled={!canEdit}
                         onChange={(e) =>
                           updatePlayer(p.id, {
                             isMainRoster: e.target.value === 'main',
@@ -303,7 +301,8 @@ export default function RosterPage() {
                       </select>
                     </td>
                     <td className="table-cell">
-                      <button
+                      <WriteButton
+                        canEdit={canEdit}
                         onClick={() => {
                           if (
                             confirm(
@@ -315,13 +314,17 @@ export default function RosterPage() {
                         className="btn-danger"
                       >
                         Remove
-                      </button>
+                      </WriteButton>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+
+          {isOwner && (
+            <RosterSharing rosterId={activeRoster.id} players={rosterPlayers} />
+          )}
         </>
       )}
     </div>

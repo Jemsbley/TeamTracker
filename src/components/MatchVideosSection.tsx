@@ -1,5 +1,6 @@
 import MapIcon from './MapIcon';
-import { sortSeriesGames, useStore } from '../store';
+import WriteButton, { WRITE_TOOLTIP } from './WriteButton';
+import { sortSeriesGames, useStore, canEditSeries } from '../store';
 import type { Game, MatchVideo, Series } from '../types';
 
 const uid = () =>
@@ -16,11 +17,13 @@ export default function MatchVideosSection({ series }: Props) {
     s.games.filter((g) => g.seriesId === series.id)
   );
   const updateSeries = useStore((s) => s.updateSeries);
+  const canEdit = useStore((s) => canEditSeries(s, series.id));
 
   const videos = series.videos ?? [];
   const sortedGames = sortSeriesGames(games);
 
   const setVideos = (next: MatchVideo[]) => {
+    if (!canEdit) return;
     updateSeries(series.id, { videos: next });
   };
 
@@ -46,9 +49,9 @@ export default function MatchVideosSection({ series }: Props) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">Match videos</h3>
-        <button type="button" className="btn-primary" onClick={addVideo}>
+        <WriteButton canEdit={canEdit} type="button" className="btn-primary" onClick={addVideo}>
           + Add video
-        </button>
+        </WriteButton>
       </div>
       {videos.length === 0 && (
         <div className="card text-center text-valorant-muted text-sm">
@@ -60,6 +63,7 @@ export default function MatchVideosSection({ series }: Props) {
           key={v.id}
           video={v}
           games={sortedGames}
+          canEdit={canEdit}
           onUpdate={(patch) => updateVideo(v.id, patch)}
           onRemove={() => {
             if (confirm('Delete this video link?')) removeVideo(v.id);
@@ -73,11 +77,13 @@ export default function MatchVideosSection({ series }: Props) {
 function VideoCard({
   video,
   games,
+  canEdit,
   onUpdate,
   onRemove,
 }: {
   video: MatchVideo;
   games: Game[];
+  canEdit: boolean;
   onUpdate: (patch: Partial<MatchVideo>) => void;
   onRemove: () => void;
 }) {
@@ -90,7 +96,12 @@ function VideoCard({
   };
 
   return (
-    <div className="card space-y-3">
+    <div className="card">
+      <fieldset
+        disabled={!canEdit}
+        title={!canEdit ? WRITE_TOOLTIP : undefined}
+        className="space-y-3 min-w-0 border-0 p-0 m-0 disabled:opacity-60"
+      >
       <div className="flex items-end gap-2 flex-wrap">
         <div className="flex-1 min-w-[160px]">
           <label className="label">Name</label>
@@ -165,6 +176,7 @@ function VideoCard({
           </div>
         )}
       </div>
+      </fieldset>
     </div>
   );
 }

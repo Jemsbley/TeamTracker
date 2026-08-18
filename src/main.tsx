@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { NuqsAdapter } from 'nuqs/adapters/react-router/v6';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import App from './App';
 import nutLogo from './assets/icons/nut.png';
 import { useAuth } from './authStore';
@@ -28,12 +29,16 @@ localStorage.removeItem('team-tracker-state-v1');
 // the rest of the UI tries to use it.
 useAuth.getState().init();
 
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <NuqsAdapter>
-        <App />
-      </NuqsAdapter>
-    </BrowserRouter>
+    <GoogleOAuthProvider clientId={googleClientId}>
+      <BrowserRouter>
+        <NuqsAdapter>
+          <App />
+        </NuqsAdapter>
+      </BrowserRouter>
+    </GoogleOAuthProvider>
   </React.StrictMode>
 );

@@ -29,6 +29,27 @@ export function hasRecord(m: ScoutMap): boolean {
 }
 
 /**
+ * The map this opponent has been recorded playing the most (wins + losses).
+ * Null if no map has any recorded plays yet.
+ */
+export function favoriteMap(maps: ScoutMap[]): ValorantMap | null {
+  let best: ScoutMap | null = null;
+  for (const m of maps) {
+    const plays = m.wins + m.losses;
+    if (plays === 0) continue;
+    const bestPlays = best ? best.wins + best.losses : -1;
+    if (
+      !best ||
+      plays > bestPlays ||
+      (plays === bestPlays && m.map.localeCompare(best.map) < 0)
+    ) {
+      best = m;
+    }
+  }
+  return best?.map ?? null;
+}
+
+/**
  * Most wins first; ties broken by fewest losses, then map name. Maps with no
  * record entered yet are kept at the bottom (sorted by name).
  */

@@ -55,15 +55,15 @@ export default function MapPicker({
       >
         {value ? (
           <>
-            <MapIcon map={value} width={28} height={18} />
-            <span>{value}</span>
+            <MapIcon map={value} width={28} height={18} className="shrink-0" />
+            <span className="truncate">{value}</span>
           </>
         ) : (
-          <span className="text-valorant-muted">
+          <span className="text-valorant-muted truncate">
             {includeEmpty ? emptyLabel : placeholder}
           </span>
         )}
-        <span className="ml-auto text-valorant-muted">▾</span>
+        <span className="ml-auto text-valorant-muted shrink-0">▾</span>
       </button>
       {open && (
         <div className="absolute z-20 mt-1 w-72 max-h-96 overflow-auto bg-valorant-panel border border-white/10 rounded-md shadow-lg py-1">

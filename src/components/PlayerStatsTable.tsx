@@ -121,7 +121,7 @@ export default function PlayerStatsTable({
     const mag = Math.abs(diff).toFixed(digits);
     return (
       <span
-        className={`block text-[10px] leading-none mt-0.5 ${
+        className={`block text-xs leading-none mt-0.5 ${
           up ? 'text-green-400' : 'text-red-400'
         }`}
       >
@@ -171,7 +171,7 @@ export default function PlayerStatsTable({
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{player.name}</span>
                   {!player.isMainRoster && (
-                    <span className="text-[10px] uppercase tracking-wide text-valorant-muted px-1 py-0.5 rounded bg-white/5">
+                    <span className="text-xs uppercase tracking-wide text-valorant-muted px-1 py-0.5 rounded bg-white/5">
                       Sub
                     </span>
                   )}

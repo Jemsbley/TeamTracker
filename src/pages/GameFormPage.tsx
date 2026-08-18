@@ -1,17 +1,33 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import AgentIcon from '../components/AgentIcon';
 import AgentPicker from '../components/AgentPicker';
 import MapPicker from '../components/MapPicker';
 import RoundsEditor from '../components/RoundsEditor';
+import PageHeader from '../components/PageHeader';
 import { PLAYERS_PER_GAME } from '../constants';
-import { newBlankStat, useStore } from '../store';
+import { newBlankStat, useStore, canEditSeries } from '../store';
+import { WRITE_TOOLTIP } from '../components/WriteButton';
 import type { GameStat, Round, Side, ValorantMap } from '../types';
 import { deriveScore, gameEconomy, pct } from '../utils/rounds';
 import { gameMvpPlayerId } from '../utils/mvp';
 import { playedMaps } from '../utils/pickBan';
 
 type StatField = keyof Omit<GameStat, 'playerId' | 'agent'>;
+
+type ImportedGamePayload = {
+  map: ValorantMap | null;
+  date: string;
+  startingSide: Side | undefined;
+  rounds: Round[];
+  stats: GameStat[];
+};
 
 const STAT_COLUMNS: {
   key: StatField;
@@ -35,6 +51,7 @@ const STAT_COLUMNS: {
 export default function GameFormPage() {
   const { seriesId, gameId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
 
   const series = useStore((s) => s.series.find((x) => x.id === seriesId));
@@ -49,6 +66,7 @@ export default function GameFormPage() {
   );
   const addGame = useStore((s) => s.addGame);
   const updateGame = useStore((s) => s.updateGame);
+  const canEdit = useStore((s) => canEditSeries(s, seriesId));
 
   const isEdit = !!gameId;
   const today = new Date().toISOString().slice(0, 10);
@@ -61,14 +79,19 @@ export default function GameFormPage() {
       ? playedMaps(series.format, series.pickBan)[slotIndex]
       : undefined;
 
+  // Data pasted in from the tracker.gg import modal, if we arrived that way.
+  const imported = !isEdit
+    ? (location.state as { imported?: ImportedGamePayload } | null)?.imported
+    : undefined;
+
   const [map, setMap] = useState<ValorantMap | ''>(
-    existing?.map ?? presetSlot?.map ?? ''
+    existing?.map ?? imported?.map ?? presetSlot?.map ?? ''
   );
   const [date, setDate] = useState<string>(
-    existing?.date ?? series?.date ?? today
+    existing?.date ?? imported?.date ?? series?.date ?? today
   );
   const [startingSide, setStartingSide] = useState<Side | ''>(
-    existing?.startingSide ?? presetSlot?.ourSide ?? ''
+    existing?.startingSide ?? imported?.startingSide ?? presetSlot?.ourSide ?? ''
   );
   const [scoreFor, setScoreFor] = useState<string>(
     existing?.scoreFor !== undefined ? String(existing.scoreFor) : ''
@@ -83,6 +106,11 @@ export default function GameFormPage() {
       while (arr.length < PLAYERS_PER_GAME) arr.push(newBlankStat());
       return arr.slice(0, PLAYERS_PER_GAME);
     }
+    if (imported) {
+      const arr = [...imported.stats];
+      while (arr.length < PLAYERS_PER_GAME) arr.push(newBlankStat());
+      return arr.slice(0, PLAYERS_PER_GAME);
+    }
     const main = players
       .filter((p) => p.isMainRoster)
       .slice(0, PLAYERS_PER_GAME);
@@ -92,12 +120,12 @@ export default function GameFormPage() {
   });
 
   const [rounds, setRounds] = useState<Round[]>(
-    () => existing?.rounds ?? []
+    () => existing?.rounds ?? imported?.rounds ?? []
   );
 
   // Auto-fill blank lineup with main roster on first render only
   useEffect(() => {
-    if (existing) return;
+    if (existing || imported) return;
     setStats((prev) => {
       const main = players
         .filter((p) => p.isMainRoster)
@@ -111,7 +139,7 @@ export default function GameFormPage() {
       });
       return changed ? next : prev;
     });
-  }, [players, existing]);
+  }, [players, existing, imported]);
 
   const usedIds = useMemo(
     () => new Set(stats.map((s) => s.playerId).filter(Boolean)),
@@ -148,6 +176,18 @@ export default function GameFormPage() {
 
   const lineupReady = stats.every((s) => s.playerId && s.agent);
 
+  const roundsLineup = useMemo(
+    () =>
+      stats
+        .filter((s) => s.playerId)
+        .map((s) => ({
+          playerId: s.playerId,
+          agent: s.agent,
+          name: players.find((p) => p.id === s.playerId)?.name ?? '?',
+        })),
+    [stats, players]
+  );
+
   // Score: derive from rounds if any results entered; else use manual fields.
   const tempGame = useMemo(
     () =>
@@ -168,7 +208,7 @@ export default function GameFormPage() {
 
   const onSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!seriesId) return;
+    if (!seriesId || !canEdit) return;
     if (!map) {
       alert('Pick a map first.');
       return;
@@ -235,18 +275,30 @@ export default function GameFormPage() {
 
   return (
     <form onSubmit={onSave} className="space-y-6">
-      <div>
-        <Link
-          to={`/series/${series.id}`}
-          className="text-xs text-valorant-muted hover:text-valorant-accent"
-        >
-          ← vs. {series.opponent}
-        </Link>
-        <h2 className="text-xl font-semibold mt-1">
-          {isEdit ? 'Edit map' : 'New map'}
-        </h2>
-      </div>
+      <PageHeader
+        title={isEdit ? 'Edit map' : 'New map'}
+        description={
+          <Link
+            to={`/series/${series.id}`}
+            className="text-xs text-valorant-muted hover:text-valorant-accent"
+          >
+            ← vs. {series.opponent}
+          </Link>
+        }
+      />
 
+      {!canEdit && (
+        <div className="card text-sm text-valorant-muted">
+          You have view-only access to this series. Ask your roster manager for
+          edit permission to record or change maps.
+        </div>
+      )}
+
+      <fieldset
+        disabled={!canEdit}
+        title={!canEdit ? WRITE_TOOLTIP : undefined}
+        className="space-y-6 min-w-0 border-0 p-0 m-0 disabled:opacity-60"
+      >
       {/* Map / date / side / score */}
       <section className="card flex flex-wrap gap-3 items-end">
         <div>
@@ -498,6 +550,7 @@ export default function GameFormPage() {
               rounds={rounds}
               startingSide={startingSide}
               onChange={setRounds}
+              lineup={roundsLineup}
             />
             <RoundEconomyMini economy={economy} />
           </>
@@ -512,6 +565,7 @@ export default function GameFormPage() {
           {isEdit ? 'Save changes' : 'Add map'}
         </button>
       </div>
+      </fieldset>
     </form>
   );
 }
@@ -524,34 +578,26 @@ function RoundEconomyMini({
   const cells: { label: string; key: keyof typeof economy }[] = [
     { label: 'Atk Pistol', key: 'attackPistol' },
     { label: 'Def Pistol', key: 'defensePistol' },
-    { label: 'Antieco', key: 'force' },
+    { label: 'Antieco', key: 'antieco' },
     { label: 'Bonus', key: 'bonus' },
     { label: 'Eco', key: 'eco' },
     { label: 'Antibonus', key: 'antibonus' },
     { label: 'Gun', key: 'gun' },
     { label: 'Save', key: 'save' },
+    { label: 'Force', key: 'force' },
   ];
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-center">
+    <div className="stat-grid">
       {cells.map(({ label, key }) => {
         const b = economy[key] as { wins: number; total: number };
         const color = miniPctColor(b.wins, b.total);
         return (
-          <div
-            key={label}
-            className="bg-valorant-panel2/40 rounded p-2"
-            title={`${b.wins} / ${b.total}`}
-          >
-            <div className="text-[10px] uppercase tracking-wider text-valorant-muted">
-              {label}
-            </div>
-            <div
-              className="text-sm font-semibold tabular-nums"
-              style={color ? { color } : undefined}
-            >
+          <div key={label} className="stat-box" title={`${b.wins} / ${b.total}`}>
+            <div className="stat-box-label">{label}</div>
+            <div className="stat-box-value text-base" style={color ? { color } : undefined}>
               {pct(b.wins, b.total)}
             </div>
-            <div className="text-[10px] text-valorant-muted">
+            <div className="stat-box-sub">
               {b.wins}/{b.total}
             </div>
           </div>

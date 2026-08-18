@@ -4,6 +4,7 @@ type Props = {
   start: string | null;
   end: string | null;
   onChange: (start: string | null, end: string | null) => void;
+  className?: string;
 };
 
 const MONTHS = [
@@ -29,7 +30,7 @@ function fmtShort(iso: string): string {
   return `${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
 }
 
-export default function DateRangePicker({ start, end, onChange }: Props) {
+export default function DateRangePicker({ start, end, onChange, className }: Props) {
   const [open, setOpen] = useState(false);
   // The month currently shown in the calendar grid (UTC y/m).
   const [view, setView] = useState(() => {
@@ -110,14 +111,16 @@ export default function DateRangePicker({ start, end, onChange }: Props) {
   const isEndpoint = (iso: string) => iso === start || iso === end;
 
   return (
-    <div className="relative">
+    <div className={`relative ${className ?? ''}`}>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="input flex items-center gap-2 text-left min-w-[12rem]"
+        className="input flex items-center gap-2 text-left"
       >
-        <span className={start || end ? '' : 'text-valorant-muted'}>{label}</span>
-        <span className="ml-auto text-valorant-muted">▾</span>
+        <span className={`truncate ${start || end ? '' : 'text-valorant-muted'}`}>
+          {label}
+        </span>
+        <span className="ml-auto text-valorant-muted shrink-0">▾</span>
       </button>
 
       {open && (
@@ -172,7 +175,7 @@ export default function DateRangePicker({ start, end, onChange }: Props) {
               {WEEKDAYS.map((w) => (
                 <div
                   key={w}
-                  className="text-[10px] uppercase tracking-wider text-valorant-muted py-1"
+                  className="text-xs uppercase tracking-wider text-valorant-muted py-1"
                 >
                   {w}
                 </div>

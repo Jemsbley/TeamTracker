@@ -26,11 +26,7 @@ function RateDelta({ wins, total, cmp }: { wins: number; total: number; cmp?: Ra
   if (diff === 0) return null;
   const up = diff > 0;
   return (
-    <div
-      className={`text-[10px] leading-none mt-0.5 ${
-        up ? 'text-green-400' : 'text-red-400'
-      }`}
-    >
+    <div className={`text-[11px] leading-none mt-1 font-semibold ${up ? 'text-green-400' : 'text-red-400'}`}>
       {up ? '▲' : '▼'}
       {Math.abs(diff)}
     </div>
@@ -47,15 +43,22 @@ type Props = {
   compare?: RoundEconomy;
 };
 
-const TYPE_CELLS: { label: string; key: keyof RoundEconomy }[] = [
+const PISTOL_CELLS: { label: string; key: keyof RoundEconomy }[] = [
   { label: 'Atk Pistol', key: 'attackPistol' },
   { label: 'Def Pistol', key: 'defensePistol' },
-  { label: 'Antieco', key: 'force' },
+];
+
+const BUY_PATTERN_CELLS: { label: string; key: keyof RoundEconomy }[] = [
+  { label: 'Antieco', key: 'antieco' },
   { label: 'Bonus', key: 'bonus' },
   { label: 'Eco', key: 'eco' },
   { label: 'Antibonus', key: 'antibonus' },
+];
+
+const MID_ROUND_CELLS: { label: string; key: keyof RoundEconomy }[] = [
   { label: 'Gun', key: 'gun' },
   { label: 'Save', key: 'save' },
+  { label: 'Force', key: 'force' },
 ];
 
 export default function RoundEconomyPanel({
@@ -68,149 +71,151 @@ export default function RoundEconomyPanel({
     wins: economy.firstBlood.total,
     total: economy.total,
   };
-
   return (
-    <div className="space-y-2">
-      {title && (
-        <h4 className="text-xs uppercase tracking-wider text-valorant-muted">
-          {title}
-        </h4>
-      )}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-center">
-        {TYPE_CELLS.map(({ label, key }) => {
-          const b = economy[key] as Rate;
-          const cmp = compare ? (compare[key] as Rate) : undefined;
-          const color = pctColor(b.wins, b.total);
-          return (
-            <div
-              key={label}
-              className="bg-valorant-panel2/40 rounded p-2"
-              title={`${b.wins} / ${b.total}`}
-            >
-              <div className="text-[10px] uppercase tracking-wider text-valorant-muted">
-                {label}
-              </div>
-              <div
-                className={`font-semibold tabular-nums ${compact ? 'text-sm' : 'text-base'}`}
-                style={color ? { color } : undefined}
-              >
-                {pct(b.wins, b.total)}
-              </div>
-              <RateDelta wins={b.wins} total={b.total} cmp={cmp} />
-              {!compact && (
-                <div className="text-[10px] text-valorant-muted">
-                  {b.wins}/{b.total}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+    <div className="space-y-4">
+      {title && <h4 className="section-title">{title}</h4>}
 
-      <div className="grid grid-cols-3 gap-2 text-center">
-        <FbCell
-          label="FB rate"
-          tooltip={`Rounds with first blood: ${fbRate.wins} / ${fbRate.total}`}
-          wins={fbRate.wins}
-          total={fbRate.total}
-          compact={compact}
-          cmp={
-            compare
-              ? { wins: compare.firstBlood.total, total: compare.total }
-              : undefined
-          }
-        />
-        <FbCell
-          label="Win | FB"
-          tooltip={`Wins when we got first blood: ${economy.firstBlood.wins} / ${economy.firstBlood.total}`}
-          wins={economy.firstBlood.wins}
-          total={economy.firstBlood.total}
-          compact={compact}
-          cmp={compare?.firstBlood}
-        />
-        <FbCell
-          label="Win | no FB"
-          tooltip={`Wins when no first blood: ${economy.noFirstBlood.wins} / ${economy.noFirstBlood.total}`}
-          wins={economy.noFirstBlood.wins}
-          total={economy.noFirstBlood.total}
-          compact={compact}
-          cmp={compare?.noFirstBlood}
-        />
+      <RateSection
+        label="Pistols"
+        cells={PISTOL_CELLS}
+        economy={economy}
+        compare={compare}
+        compact={compact}
+      />
+      <RateSection
+        label="Half-buy pattern"
+        cells={BUY_PATTERN_CELLS}
+        economy={economy}
+        compare={compare}
+        compact={compact}
+      />
+      <RateSection
+        label="Mid-round buys"
+        cells={MID_ROUND_CELLS}
+        economy={economy}
+        compare={compare}
+        compact={compact}
+      />
+
+      <div>
+        <h5 className="section-title">Engagements</h5>
+        <div className="stat-grid">
+          <Cell
+            label="FB rate"
+            tooltip={`Rounds with first blood: ${fbRate.wins} / ${fbRate.total}`}
+            wins={fbRate.wins}
+            total={fbRate.total}
+            compact={compact}
+            cmp={
+              compare
+                ? { wins: compare.firstBlood.total, total: compare.total }
+                : undefined
+            }
+          />
+          <Cell
+            label="Win | FB"
+            tooltip={`Wins when we got first blood: ${economy.firstBlood.wins} / ${economy.firstBlood.total}`}
+            wins={economy.firstBlood.wins}
+            total={economy.firstBlood.total}
+            compact={compact}
+            cmp={compare?.firstBlood}
+          />
+          <Cell
+            label="Win | no FB"
+            tooltip={`Wins when no first blood: ${economy.noFirstBlood.wins} / ${economy.noFirstBlood.total}`}
+            wins={economy.noFirstBlood.wins}
+            total={economy.noFirstBlood.total}
+            compact={compact}
+            cmp={compare?.noFirstBlood}
+          />
+          <Cell
+            label="Clutch W%"
+            tooltip={`Marked clutches won: ${economy.clutch.wins} / ${economy.clutch.total}`}
+            wins={economy.clutch.wins}
+            total={economy.clutch.total}
+            compact={compact}
+            cmp={compare?.clutch}
+          />
+        </div>
       </div>
 
       {(economy.attack.rounds > 0 || economy.defense.rounds > 0) && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-          <FbCell
-            label="Atk plant %"
-            tooltip={`Attack rounds we planted: ${economy.attack.plants} / ${economy.attack.rounds}`}
-            wins={economy.attack.plants}
-            total={economy.attack.rounds}
-            compact={compact}
-            cmp={
-              compare
-                ? { wins: compare.attack.plants, total: compare.attack.rounds }
-                : undefined
-            }
-          />
-          <FbCell
-            label="Postplant W%"
-            tooltip={`Won attack rounds where we planted: ${economy.attack.postplantWins} / ${economy.attack.plants}`}
-            wins={economy.attack.postplantWins}
-            total={economy.attack.plants}
-            compact={compact}
-            cmp={
-              compare
-                ? {
-                    wins: compare.attack.postplantWins,
-                    total: compare.attack.plants,
-                  }
-                : undefined
-            }
-          />
-          <FbCell
-            label="Plant allowed"
-            tooltip={`Defense rounds where opponent planted: ${economy.defense.plantsAllowed} / ${economy.defense.rounds}`}
-            wins={economy.defense.plantsAllowed}
-            total={economy.defense.rounds}
-            compact={compact}
-            cmp={
-              compare
-                ? {
-                    wins: compare.defense.plantsAllowed,
-                    total: compare.defense.rounds,
-                  }
-                : undefined
-            }
-          />
-          <FbCell
-            label="Retake W%"
-            tooltip={`Won defense rounds after a plant: ${economy.defense.retakeWins} / ${economy.defense.plantsAllowed}`}
-            wins={economy.defense.retakeWins}
-            total={economy.defense.plantsAllowed}
-            compact={compact}
-            cmp={
-              compare
-                ? {
-                    wins: compare.defense.retakeWins,
-                    total: compare.defense.plantsAllowed,
-                  }
-                : undefined
-            }
-          />
+        <div>
+          <h5 className="section-title">Site control</h5>
+          <div className="stat-grid">
+            <Cell
+              label="Atk plant %"
+              tooltip={`Attack rounds we planted: ${economy.attack.plants} / ${economy.attack.rounds}`}
+              wins={economy.attack.plants}
+              total={economy.attack.rounds}
+              compact={compact}
+              cmp={
+                compare
+                  ? { wins: compare.attack.plants, total: compare.attack.rounds }
+                  : undefined
+              }
+            />
+            <Cell
+              label="Postplant W%"
+              tooltip={`Won attack rounds where we planted: ${economy.attack.postplantWins} / ${economy.attack.plants}`}
+              wins={economy.attack.postplantWins}
+              total={economy.attack.plants}
+              compact={compact}
+              cmp={
+                compare
+                  ? {
+                      wins: compare.attack.postplantWins,
+                      total: compare.attack.plants,
+                    }
+                  : undefined
+              }
+            />
+            <Cell
+              label="Plant allowed"
+              tooltip={`Defense rounds where opponent planted: ${economy.defense.plantsAllowed} / ${economy.defense.rounds}`}
+              wins={economy.defense.plantsAllowed}
+              total={economy.defense.rounds}
+              compact={compact}
+              cmp={
+                compare
+                  ? {
+                      wins: compare.defense.plantsAllowed,
+                      total: compare.defense.rounds,
+                    }
+                  : undefined
+              }
+            />
+            <Cell
+              label="Retake W%"
+              tooltip={`Won defense rounds after a plant: ${economy.defense.retakeWins} / ${economy.defense.plantsAllowed}`}
+              wins={economy.defense.retakeWins}
+              total={economy.defense.plantsAllowed}
+              compact={compact}
+              cmp={
+                compare
+                  ? {
+                      wins: compare.defense.retakeWins,
+                      total: compare.defense.plantsAllowed,
+                    }
+                  : undefined
+              }
+            />
+          </div>
         </div>
       )}
 
       {economy.total > 0 && (
-        <div className="text-xs text-valorant-muted flex items-center gap-1">
-          Round win rate:{' '}
+        <div className="text-sm text-valorant-muted flex items-center gap-1.5 pt-1 border-t border-white/5">
+          <span className="font-medium">Round win rate:</span>
           <span
+            className="font-bold"
             style={{
               color: pctColor(economy.totalWins, economy.total) ?? undefined,
             }}
           >
             {pct(economy.totalWins, economy.total)}
-          </span>{' '}
-          ({economy.totalWins}/{economy.total})
+          </span>
+          <span className="tabular-nums">({economy.totalWins}/{economy.total})</span>
           <RoundWinDelta
             wins={economy.totalWins}
             total={economy.total}
@@ -226,6 +231,44 @@ export default function RoundEconomyPanel({
   );
 }
 
+/** A labeled group of round-category win-rate cells sharing one stat-grid row. */
+function RateSection({
+  label,
+  cells,
+  economy,
+  compare,
+  compact,
+}: {
+  label: string;
+  cells: { label: string; key: keyof RoundEconomy }[];
+  economy: RoundEconomy;
+  compare?: RoundEconomy;
+  compact?: boolean;
+}) {
+  return (
+    <div>
+      <h5 className="section-title">{label}</h5>
+      <div className="stat-grid">
+        {cells.map(({ label: cellLabel, key }) => {
+          const b = economy[key] as Rate;
+          const cmp = compare ? (compare[key] as Rate) : undefined;
+          return (
+            <Cell
+              key={cellLabel}
+              label={cellLabel}
+              tooltip={`${b.wins} / ${b.total}`}
+              wins={b.wins}
+              total={b.total}
+              compact={compact}
+              cmp={cmp}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /** Inline variant of the rate delta for the round-win-rate footer line. */
 function RoundWinDelta({ wins, total, cmp }: { wins: number; total: number; cmp?: Rate }) {
   if (!cmp || !total || !cmp.total) return null;
@@ -233,14 +276,14 @@ function RoundWinDelta({ wins, total, cmp }: { wins: number; total: number; cmp?
   if (diff === 0) return null;
   const up = diff > 0;
   return (
-    <span className={up ? 'text-green-400' : 'text-red-400'}>
+    <span className={`font-semibold ${up ? 'text-green-400' : 'text-red-400'}`}>
       {up ? '▲' : '▼'}
       {Math.abs(diff)}
     </span>
   );
 }
 
-function FbCell({
+function Cell({
   label,
   tooltip,
   wins,
@@ -257,22 +300,16 @@ function FbCell({
 }) {
   const color = pctColor(wins, total);
   return (
-    <div className="bg-valorant-panel2/40 rounded p-2" title={tooltip}>
-      <div className="text-[10px] uppercase tracking-wider text-valorant-muted">
-        {label}
-      </div>
+    <div className="stat-box" title={tooltip}>
+      <div className="stat-box-label">{label}</div>
       <div
-        className={`font-semibold tabular-nums ${compact ? 'text-sm' : 'text-base'}`}
+        className={`stat-box-value ${compact ? 'text-base' : 'text-xl'}`}
         style={color ? { color } : undefined}
       >
         {pct(wins, total)}
       </div>
       <RateDelta wins={wins} total={total} cmp={cmp} />
-      {!compact && (
-        <div className="text-[10px] text-valorant-muted">
-          {wins}/{total}
-        </div>
-      )}
+      {!compact && <div className="stat-box-sub">{wins}/{total}</div>}
     </div>
   );
 }

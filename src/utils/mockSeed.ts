@@ -174,12 +174,17 @@ function plantedFor(side: Side): boolean {
   return Math.random() < (side === 'Attack' ? 0.6 : 0.5);
 }
 
-function categoryFor(idx: number): 'gun' | 'save' | undefined {
+function categoryFor(idx: number): 'gun' | 'save' | 'force' | undefined {
   const slot = idx < 12 ? idx : idx < 24 ? idx - 12 : null;
+  if (slot === 0) return undefined;
   if (slot === null || slot >= 3) {
-    return Math.random() < 0.7 ? 'gun' : 'save';
+    const roll = Math.random();
+    if (roll < 0.6) return 'gun';
+    if (roll < 0.85) return 'save';
+    return 'force';
   }
-  return undefined;
+  // Slots 1-2: occasionally tag as a force buy; otherwise auto-derived.
+  return Math.random() < 0.2 ? 'force' : undefined;
 }
 
 function buildRound(idx: number, won: boolean, startingSide: Side): Round {

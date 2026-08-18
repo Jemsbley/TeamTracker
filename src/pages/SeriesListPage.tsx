@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { parseAsString, useQueryState } from 'nuqs';
+import GettingStarted from '../components/GettingStarted';
 import MapIcon from '../components/MapIcon';
-import { sortSeriesGames, useStore } from '../store';
+import PageHeader from '../components/PageHeader';
+import WriteButton from '../components/WriteButton';
+import { sortSeriesGames, useStore, canEditRoster, canEditSeries } from '../store';
 import {
   SERIES_FORMATS,
   type Game,
@@ -12,7 +15,7 @@ import {
   type ValorantMap,
 } from '../types';
 import { seriesStatus } from '../utils/series';
-import { defaultRosterId } from '../utils/rosters';
+import { ALL_ROSTERS, defaultRosterId, resolveRosterFilter } from '../utils/rosters';
 import { deriveScore } from '../utils/rounds';
 import { gameMvpPlayerId, seriesMvpPlayerId } from '../utils/mvp';
 import { PICKBAN_STEPS, isUs, type Team } from '../utils/pickBan';
@@ -79,6 +82,8 @@ export default function SeriesListPage() {
   const rosters = useStore((s) => s.rosters);
   const addSeries = useStore((s) => s.addSeries);
   const removeSeries = useStore((s) => s.removeSeries);
+  const adminViewing = useStore((s) => s.adminViewing);
+  const gate = { rosters, series, adminViewing };
 
   const today = new Date().toISOString().slice(0, 10);
   const [opponent, setOpponent] = useState('');
@@ -87,113 +92,95 @@ export default function SeriesListPage() {
   const [newRosterId, setNewRosterId] = useState<string>(() =>
     defaultRosterId(rosters)
   );
-  const [rosterFilter, setRosterFilter] = useQueryState(
-    'roster',
-    parseAsString.withDefault('')
-  );
+  // The roster filter defaults to the primary roster rather than all rosters.
+  const [rosterParam, setRosterParam] = useQueryState('roster', parseAsString);
+  const rosterFilter = resolveRosterFilter(rosterParam, rosters);
 
   // Keep the new-series roster picker pointed at a real roster
   if (newRosterId && !rosters.find((r) => r.id === newRosterId)) {
     setNewRosterId(defaultRosterId(rosters));
   }
 
+  const canCreate = canEditRoster(gate, newRosterId);
+
   const onAdd = (e: React.FormEvent) => {
     e.preventDefault();
     const o = opponent.trim();
-    if (!o || !newRosterId) return;
+    if (!o || !newRosterId || !canCreate) return;
     addSeries({ opponent: o, date, format, rosterId: newRosterId });
     setOpponent('');
     setDate(today);
     setFormat('BO3');
   };
 
-  const filteredSeries = rosterFilter
-    ? series.filter((s) => s.rosterId === rosterFilter)
-    : series;
+  const filteredSeries =
+    rosterFilter === ALL_ROSTERS
+      ? series
+      : series.filter((s) => s.rosterId === rosterFilter);
   const sorted = [...filteredSeries].sort((a, b) =>
     b.date.localeCompare(a.date)
   );
   const rosterById = (id: string) =>
     rosters.find((r) => r.id === id)?.name ?? '?';
 
+  // Without a roster there's nothing to attach a series to — send the user to
+  // set one up first.
+  if (rosters.length === 0) {
+    return <GettingStarted hasRoster={false} />;
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">Series</h2>
-          <p className="text-sm text-valorant-muted">
-            {series.length} series · {games.length} games tracked
-          </p>
-        </div>
-      </div>
-
-      <form onSubmit={onAdd} className="card flex flex-wrap gap-3 items-end">
-        <div className="flex-1 min-w-[220px]">
-          <label className="label">Opponent</label>
-          <input
-            className="input"
-            value={opponent}
-            onChange={(e) => setOpponent(e.target.value)}
-            placeholder="e.g. Lesley University"
-          />
-        </div>
-        <div>
-          <label className="label">Date</label>
-          <input
-            type="date"
-            className="input"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="label">Roster</label>
-          <select
-            className="input"
-            value={newRosterId}
-            onChange={(e) => setNewRosterId(e.target.value)}
-          >
-            {rosters.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label">Format</label>
-          <div className="inline-flex rounded overflow-hidden border border-white/10">
-            {SERIES_FORMATS.map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFormat(f)}
-                className={`px-3 py-1.5 text-sm ${
-                  format === f
-                    ? 'bg-valorant-red/30 text-white'
-                    : 'bg-transparent text-valorant-muted hover:bg-white/5'
-                }`}
+      <PageHeader
+        title="Series"
+        titleGrow={false}
+        description={`${series.length} series · ${games.length} games tracked`}
+      >
+        {rosters.length > 1 && (
+          <div className="flex items-end gap-3">
+            <div>
+              <label className="label">Filter by roster</label>
+              <select
+                className="input"
+                value={rosterFilter}
+                onChange={(e) => setRosterParam(e.target.value)}
               >
-                {f}
-              </button>
-            ))}
+                <option value={ALL_ROSTERS}>All rosters</option>
+                {rosters.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
-        <button className="btn-primary" type="submit">
-          New series
-        </button>
-      </form>
-
-      {rosters.length > 1 && (
-        <div className="card flex items-end gap-3">
+        )}
+        <form onSubmit={onAdd} className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[220px]">
+            <label className="label">Opponent</label>
+            <input
+              className="input"
+              value={opponent}
+              onChange={(e) => setOpponent(e.target.value)}
+              placeholder="e.g. Lesley University"
+            />
+          </div>
           <div>
-            <label className="label">Filter by roster</label>
+            <label className="label">Date</label>
+            <input
+              type="date"
+              className="input"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">Roster</label>
             <select
               className="input"
-              value={rosterFilter}
-              onChange={(e) => setRosterFilter(e.target.value)}
+              value={newRosterId}
+              onChange={(e) => setNewRosterId(e.target.value)}
             >
-              <option value="">All rosters</option>
               {rosters.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}
@@ -201,8 +188,30 @@ export default function SeriesListPage() {
               ))}
             </select>
           </div>
-        </div>
-      )}
+          <div>
+            <label className="label">Format</label>
+            <div className="inline-flex rounded overflow-hidden border border-white/10">
+              {SERIES_FORMATS.map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setFormat(f)}
+                  className={`px-3 py-1.5 text-sm ${
+                    format === f
+                      ? 'bg-valorant-red/30 text-white'
+                      : 'bg-transparent text-valorant-muted hover:bg-white/5'
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
+          <WriteButton canEdit={canCreate} className="btn-primary" type="submit">
+            New series
+          </WriteButton>
+        </form>
+      </PageHeader>
 
       <div className="space-y-3">
         {sorted.length === 0 && (
@@ -232,28 +241,28 @@ export default function SeriesListPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <div className="text-lg font-semibold">vs. {s.opponent}</div>
                     {rosters.length > 1 && (
-                      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-valorant-panel2 text-valorant-accent">
+                      <span className="text-xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-valorant-panel2 text-valorant-accent">
                         {rosterById(s.rosterId)}
                       </span>
                     )}
                     {s.format && (
-                      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5 text-valorant-muted">
+                      <span className="text-xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5 text-valorant-muted">
                         {s.format}
                       </span>
                     )}
                     {status.kind === 'won' && (
-                      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-green-500/20 text-green-200">
+                      <span className="text-xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-green-500/20 text-green-200">
                         Won {status.mapsFor}–{status.mapsAgainst}
                       </span>
                     )}
                     {status.kind === 'lost' && (
-                      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-red-500/20 text-red-200">
+                      <span className="text-xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-red-500/20 text-red-200">
                         Lost {status.mapsFor}–{status.mapsAgainst}
                       </span>
                     )}
                     {status.kind === 'in_progress' &&
                       status.mapsFor + status.mapsAgainst > 0 && (
-                        <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-200">
+                        <span className="text-xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-200">
                           {status.mapsFor}–{status.mapsAgainst}
                         </span>
                       )}
@@ -277,7 +286,8 @@ export default function SeriesListPage() {
                     </div>
                   )}
                 </div>
-                <button
+                <WriteButton
+                  canEdit={canEditSeries(gate, s.id)}
                   className="btn-danger"
                   onClick={(e) => {
                     e.preventDefault();
@@ -291,7 +301,7 @@ export default function SeriesListPage() {
                   }}
                 >
                   Delete
-                </button>
+                </WriteButton>
               </div>
 
               {entries.length > 0 ? (
