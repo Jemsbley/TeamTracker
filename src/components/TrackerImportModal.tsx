@@ -17,6 +17,7 @@ type ImportPayload = {
   startingSide: Side | undefined;
   rounds: Round[];
   stats: GameStat[];
+  rawJson: unknown;
 };
 
 type Props = {
@@ -113,6 +114,7 @@ export default function TrackerImportModal({ players, onImport, onClose }: Props
       startingSide,
       rounds,
       stats: rawStats.slice(0, PLAYERS_PER_GAME),
+      rawJson: result.raw,
     });
   };
 

@@ -150,6 +150,8 @@ export type Game = {
   startingSide?: Side;
   rounds?: Round[];
   stats: GameStat[];
+  /** Verbatim JSON the game was imported from (e.g. tracker.gg's match response), kept so unparsed fields can be extracted retroactively later. */
+  rawJson?: unknown;
 };
 
 /** A single agent composition: up to 5 agent names (slots may be ''). */

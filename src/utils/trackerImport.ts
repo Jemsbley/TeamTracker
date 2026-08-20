@@ -24,6 +24,8 @@ export type TrackerImportedPlayer = {
 export type TrackerImportResult = {
   map: ValorantMap | null;
   date: string; // yyyy-mm-dd
+  /** The full parsed tracker.gg response, kept verbatim for storage alongside the extracted fields. */
+  raw: unknown;
   teams: Record<
     TeamColor,
     { roundsWon: number; roundsLost: number; startingSide: Side | null }
@@ -228,7 +230,7 @@ export function parseTrackerMatchJson(raw: string): TrackerImportResult {
     return { identifier, name, team, agent, stat };
   });
 
-  return { map, date, teams, players, rounds };
+  return { map, date, raw: root, teams, players, rounds };
 }
 
 function countAbove(loadouts: number[], threshold: number): number {

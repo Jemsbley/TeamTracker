@@ -172,6 +172,10 @@ model Game {
   startingSide String?
   rounds       Json?
   stats        Json // GameStat[]
+  // Full JSON blob the game was imported from (e.g. the tracker.gg match
+  // response), kept verbatim so fields we don't parse yet can be extracted
+  // retroactively later without re-collecting data.
+  rawJson      Json?
 
   user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
   series Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)

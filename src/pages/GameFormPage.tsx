@@ -27,6 +27,7 @@ type ImportedGamePayload = {
   startingSide: Side | undefined;
   rounds: Round[];
   stats: GameStat[];
+  rawJson: unknown;
 };
 
 const STAT_COLUMNS: {
@@ -122,6 +123,8 @@ export default function GameFormPage() {
   const [rounds, setRounds] = useState<Round[]>(
     () => existing?.rounds ?? imported?.rounds ?? []
   );
+  // Carried through unedited from the import, if any; preserved as-is on save.
+  const [rawJson] = useState<unknown>(() => imported?.rawJson);
 
   // Auto-fill blank lineup with main roster on first render only
   useEffect(() => {
@@ -241,6 +244,7 @@ export default function GameFormPage() {
       startingSide: startingSide || undefined,
       rounds: rounds.length ? rounds : undefined,
       stats: cleanStats,
+      ...(rawJson !== undefined ? { rawJson } : {}),
     };
 
     if (isEdit && gameId) {

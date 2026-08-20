@@ -46,6 +46,10 @@ const gameBody = z.object({
   startingSide: side.optional(),
   rounds: z.array(round).optional(),
   stats: z.array(gameStat),
+  // Verbatim JSON the game was imported from (e.g. the tracker.gg match
+  // response), accepted as opaque JSON and stored as-is so unparsed fields
+  // can be extracted later without re-collecting data.
+  rawJson: z.any().optional(),
 });
 
 const gameCreate = gameBody.extend({ id: z.string().min(1).max(64).optional() });
