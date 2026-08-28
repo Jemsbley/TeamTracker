@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import nutLogo from '../assets/icons/nut.png';
+import generatorLogo from '../assets/icons/generator.png';
 import { useAuth } from '../authStore';
 import { me } from '../api/endpoints';
 
@@ -41,7 +41,7 @@ export default function OnboardingPage() {
         onSubmit={onSubmit}
         className="w-full max-w-sm bg-valorant-panel p-6 rounded-lg border border-white/5 space-y-4 text-center"
       >
-        <img src={nutLogo} alt="Team Tracker" className="h-12 w-12 object-contain mx-auto" />
+        <img src={generatorLogo} alt="Generator's University Team Tracking System" className="h-12 w-12 object-contain mx-auto" />
         <h1 className="text-xl font-semibold">Pick a username</h1>
         <p className="text-sm text-valorant-muted">
           Signed in as {user.email}. Choose a display name to finish setting up

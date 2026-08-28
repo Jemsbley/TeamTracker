@@ -96,6 +96,22 @@ model RosterInvite {
   @@index([rosterId])
 }
 
+// A shareable link that lets someone create their own independent account —
+// their own "Main" roster, not shared with or attached to any existing
+// roster/user. Distinct from RosterInvite, which grants access to an
+// existing roster's player slot. Signup itself is already open to any Google
+// account (see auth.ts); this exists so an admin can hand out a deliberate
+// onboarding link and see who used it.
+model AccountInvite {
+  id         String   @id @default(cuid())
+  token      String   @unique
+  createdBy  String
+  acceptedBy String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdBy])
+}
+
 model Player {
   id           String  @id
   // createdBy audit field (nullable; SetNull so a teammate deleting their

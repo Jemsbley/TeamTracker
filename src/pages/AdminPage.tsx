@@ -16,6 +16,8 @@ export default function AdminPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [inviting, setInviting] = useState(false);
 
   useEffect(() => {
     admin
@@ -51,6 +53,22 @@ export default function AdminPage() {
     }
   };
 
+  const inviteNewUser = async () => {
+    setError(null);
+    setInviting(true);
+    try {
+      const invite = await admin.createAccountInvite();
+      const url = `${window.location.origin}/invite/account/${invite.token}`;
+      await navigator.clipboard.writeText(url);
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 2000);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setInviting(false);
+    }
+  };
+
   const viewData = async (u: AdminUser) => {
     try {
       await loadUserStateAsAdmin(u.id, u.username ?? u.email);
@@ -65,7 +83,21 @@ export default function AdminPage() {
       <PageHeader
         title="User management"
         description={`${users.length} user${users.length === 1 ? '' : 's'} on the platform`}
-      />
+      >
+        <div className="flex flex-col items-start gap-1">
+          <button
+            onClick={inviteNewUser}
+            disabled={inviting}
+            className="px-3 py-1.5 rounded text-sm bg-valorant-red text-white font-medium disabled:opacity-50"
+          >
+            {inviting ? 'Generating…' : inviteCopied ? 'Copied link!' : 'Invite new user'}
+          </button>
+          <p className="text-xs text-valorant-muted">
+            Copies a link for someone to get their own independent account and
+            roster — not shared with anyone else.
+          </p>
+        </div>
+      </PageHeader>
 
       {error && <p className="text-sm text-red-400">{error}</p>}
       {loading ? (

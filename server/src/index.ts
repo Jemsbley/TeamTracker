@@ -12,6 +12,7 @@ import { scoutingReportsRouter } from './routes/scoutingReports.js';
 import { meRouter } from './routes/me.js';
 import { membersRouter } from './routes/members.js';
 import { rosterInvitesRouter, invitesRouter } from './routes/invites.js';
+import { accountInvitesRouter } from './routes/accountInvites.js';
 import { adminRouter } from './routes/admin.js';
 import { requireAuth } from './auth.js';
 import { requireAdmin } from './access.js';
@@ -48,6 +49,7 @@ app.use('/series', requireAuth, seriesRouter);
 app.use('/games', requireAuth, gamesRouter);
 app.use('/scouting-reports', requireAuth, scoutingReportsRouter);
 app.use('/invites', requireAuth, invitesRouter);
+app.use('/account-invites', requireAuth, accountInvitesRouter);
 app.use('/admin', requireAuth, requireAdmin, adminRouter);
 
 app.use((req, res) => {

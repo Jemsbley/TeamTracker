@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
-import nutLogo from '../assets/icons/nut.png';
+import generatorLogo from '../assets/icons/generator.png';
 import { useAuth } from '../authStore';
 import { useStore } from '../store';
 import { Bone } from '../components/skeletons';
@@ -50,7 +50,7 @@ export default function InvitePage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-valorant-bg">
       <div className="w-full max-w-sm bg-valorant-panel p-6 rounded-lg border border-white/5 space-y-5 text-center">
-        <img src={nutLogo} alt="Team Tracker" className="h-12 w-12 object-contain mx-auto" />
+        <img src={generatorLogo} alt="Generator's University Team Tracking System" className="h-12 w-12 object-contain mx-auto" />
         <h1 className="text-xl font-semibold">Roster invite</h1>
 
         {status !== 'authenticated' ? (

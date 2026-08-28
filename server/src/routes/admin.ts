@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
 import { prisma } from '../prisma.js';
 import { asyncHandler, HttpError } from '../util.js';
 
@@ -63,6 +64,31 @@ adminRouter.delete(
     if (!exists) throw new HttpError(404, 'User not found');
     await prisma.user.delete({ where: { id: req.params.id } });
     res.status(204).end();
+  })
+);
+
+/**
+ * Account invites: a link an admin can hand out so someone signs up with
+ * their own independent account (no roster attached). Distinct from
+ * RosterInvite, which invites into an existing roster's player slot.
+ */
+adminRouter.get(
+  '/account-invites',
+  asyncHandler(async (_req, res) => {
+    const invites = await prisma.accountInvite.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(invites);
+  })
+);
+
+adminRouter.post(
+  '/account-invites',
+  asyncHandler(async (req, res) => {
+    const invite = await prisma.accountInvite.create({
+      data: { token: randomUUID(), createdBy: req.userId! },
+    });
+    res.status(201).json(invite);
   })
 );
 

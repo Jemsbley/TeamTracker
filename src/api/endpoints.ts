@@ -99,6 +99,20 @@ export const invites = {
     api<{ rosterId: string }>(`/invites/${token}/accept`, { method: 'POST' }),
 };
 
+export type AccountInvite = {
+  id: string;
+  token: string;
+  createdBy: string;
+  acceptedBy: string | null;
+  createdAt: string;
+};
+
+export const accountInvites = {
+  info: (token: string) => api<{ accepted: boolean }>(`/account-invites/${token}`),
+  accept: (token: string) =>
+    api<{ ok: true }>(`/account-invites/${token}/accept`, { method: 'POST' }),
+};
+
 export type AdminUser = {
   id: string;
   email: string;
@@ -116,4 +130,6 @@ export const admin = {
   removeUser: (id: string) => api<void>(`/admin/users/${id}`, { method: 'DELETE' }),
   userState: (id: string) =>
     api<{ user: AuthUser; state: AppState }>(`/admin/users/${id}/state`),
+  createAccountInvite: () =>
+    api<AccountInvite>('/admin/account-invites', { method: 'POST' }),
 };

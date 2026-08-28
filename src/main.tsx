@@ -4,7 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { NuqsAdapter } from 'nuqs/adapters/react-router/v6';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import App from './App';
-import nutLogo from './assets/icons/nut.png';
+import generatorLogo from './assets/icons/generator.png';
 import { useAuth } from './authStore';
 import './index.css';
 
@@ -16,7 +16,7 @@ import './index.css';
   const link = document.createElement('link');
   link.rel = 'icon';
   link.type = 'image/png';
-  link.href = nutLogo;
+  link.href = generatorLogo;
   document.head.appendChild(link);
 }
 

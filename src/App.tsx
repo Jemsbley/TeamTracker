@@ -17,6 +17,7 @@ import OnboardingPage from './pages/OnboardingPage';
 import SettingsPage from './pages/SettingsPage';
 import AdminPage from './pages/AdminPage';
 import InvitePage from './pages/InvitePage';
+import AccountInvitePage from './pages/AccountInvitePage';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/onboarding" element={<OnboardingPage />} />
       <Route path="/invite/:token" element={<InvitePage />} />
+      <Route path="/invite/account/:token" element={<AccountInvitePage />} />
       <Route element={<AuthGuard />}>
         <Route path="/" element={<Layout />}>
           <Route index element={<StatsPage />} />

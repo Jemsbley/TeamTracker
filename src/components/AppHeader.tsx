@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import nutLogo from '../assets/icons/nut.png';
+import generatorLogo from '../assets/icons/generator.png';
 import { useAuth } from '../authStore';
 import { useStore } from '../store';
 
@@ -39,12 +39,12 @@ export default function AppHeader() {
       <div className="px-3 py-2 grid grid-cols-3 items-center gap-3">
         <div className="flex items-center gap-2 justify-self-start min-w-0">
           <img
-            src={nutLogo}
-            alt="Team Tracker"
+            src={generatorLogo}
+            alt="Generator's University Team Tracking System"
             className="h-8 w-8 object-contain shrink-0"
           />
           <h1 className="font-semibold tracking-wide truncate">
-            Northeastern University Team Tracking System
+            Generator's University Team Tracking System
           </h1>
         </div>
         <nav className="flex items-center gap-1 justify-self-center">

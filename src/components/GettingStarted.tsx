@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import nutLogo from '../assets/icons/nut.png';
+import generatorLogo from '../assets/icons/generator.png';
 
 /**
  * Full-page guidance shown on the stats/data pages while there's nothing to
@@ -9,7 +9,7 @@ import nutLogo from '../assets/icons/nut.png';
 export default function GettingStarted({ hasRoster }: { hasRoster: boolean }) {
   return (
     <div className="card max-w-xl mx-auto text-center space-y-4 py-10">
-      <img src={nutLogo} alt="" className="h-12 w-12 object-contain mx-auto" />
+      <img src={generatorLogo} alt="" className="h-12 w-12 object-contain mx-auto" />
       {hasRoster ? (
         <>
           <h2 className="text-xl font-semibold">No matches tracked yet</h2>
