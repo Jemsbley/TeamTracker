@@ -1,14 +1,10 @@
 import { MAPS } from '../constants';
 import type { Game, Series, ValorantMap } from '../types';
 import { PICKBAN_STEPS, isUs } from './pickBan';
-import { deriveScore, sideOfRound } from './rounds';
+import { effectiveScore, sideOfRound } from './rounds';
 
 function gameWinForUs(g: Game): boolean | undefined {
-  const sc =
-    deriveScore(g) ??
-    (g.scoreFor !== undefined && g.scoreAgainst !== undefined
-      ? ([g.scoreFor, g.scoreAgainst] as [number, number])
-      : undefined);
+  const sc = effectiveScore(g);
   if (!sc) return undefined;
   if (sc[0] > sc[1]) return true;
   if (sc[0] < sc[1]) return false;

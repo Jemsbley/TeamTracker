@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma.js';
-import { asyncHandler, HttpError, uid } from '../util.js';
+import { asyncHandler, HttpError, uid, stripUserId } from '../util.js';
 import { requireSeriesAccess, memberRosterIds } from '../access.js';
 
 export const gamesRouter = Router();
@@ -56,7 +56,6 @@ const gameCreate = gameBody.extend({ id: z.string().min(1).max(64).optional() })
 
 const gamePatch = gameBody.partial();
 
-const strip = ({ userId: _u, ...rest }: { userId: string | null }) => rest;
 
 gamesRouter.get(
   '/',
@@ -65,7 +64,7 @@ gamesRouter.get(
     const games = await prisma.game.findMany({
       where: { series: { rosterId: { in: rosterIds } } },
     });
-    res.json(games.map(strip));
+    res.json(games.map(stripUserId));
   })
 );
 
@@ -108,7 +107,7 @@ gamesRouter.post(
       });
     });
 
-    res.status(201).json(strip(created));
+    res.status(201).json(stripUserId(created));
   })
 );
 
@@ -126,7 +125,7 @@ gamesRouter.patch(
       where: { id: existing.id },
       data: patch,
     });
-    res.json(strip(updated));
+    res.json(stripUserId(updated));
   })
 );
 

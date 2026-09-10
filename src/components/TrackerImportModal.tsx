@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PLAYERS_PER_GAME } from '../constants';
-import { newBlankStat } from '../store';
+import { newBlankStat, useStore } from '../store';
 import type { GameStat, Player, Round, Side, ValorantMap } from '../types';
+import { guessUsTeam, matchPlayersToRoster } from '../utils/playerMatching';
 import {
   parseTrackerMatchJson,
   projectRoundsForTeam,
@@ -34,6 +35,7 @@ export default function TrackerImportModal({ players, onImport, onClose }: Props
   const [result, setResult] = useState<TrackerImportResult | null>(null);
   const [usTeam, setUsTeam] = useState<TeamColor | null>(null);
   const [assignments, setAssignments] = useState<Record<string, string>>({});
+  const updatePlayer = useStore((s) => s.updatePlayer);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -52,21 +54,9 @@ export default function TrackerImportModal({ players, onImport, onClose }: Props
         return;
       }
       setResult(parsed);
-      // Guess which side is "us" by matching tracker names against the roster.
-      const rosterNames = new Set(players.map((p) => p.name.toLowerCase()));
-      const redMatches = parsed.players.filter(
-        (p) => p.team === 'Red' && rosterNames.has(p.name.toLowerCase())
-      ).length;
-      const blueMatches = parsed.players.filter(
-        (p) => p.team === 'Blue' && rosterNames.has(p.name.toLowerCase())
-      ).length;
-      const guess: TeamColor | null =
-        redMatches === 0 && blueMatches === 0
-          ? null
-          : redMatches >= blueMatches
-            ? 'Red'
-            : 'Blue';
-      setUsTeam(guess);
+      // Guess which side is "us" — a remembered tracker.gg identifier from a
+      // past import counts, as does a name that matches the roster today.
+      setUsTeam(guessUsTeam(parsed.players, players));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to parse that data.');
     }
@@ -77,24 +67,14 @@ export default function TrackerImportModal({ players, onImport, onClose }: Props
     [result, usTeam]
   );
 
-  // (Re-)seed assignments with best-guess name matches when the team changes.
+  // (Re-)seed assignments with best-guess matches when the team changes:
+  // remembered tracker.gg identifier first, then exact name, then closest name.
   useEffect(() => {
     if (!usPlayers.length) {
       setAssignments({});
       return;
     }
-    const used = new Set<string>();
-    const next: Record<string, string> = {};
-    for (const p of usPlayers) {
-      const match = players.find(
-        (rp) => rp.name.toLowerCase() === p.name.toLowerCase() && !used.has(rp.id)
-      );
-      if (match) {
-        next[p.identifier] = match.id;
-        used.add(match.id);
-      }
-    }
-    setAssignments(next);
+    setAssignments(matchPlayersToRoster(usPlayers, players));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usTeam]);
 
@@ -102,6 +82,15 @@ export default function TrackerImportModal({ players, onImport, onClose }: Props
 
   const handleImport = () => {
     if (!result || !usTeam) return;
+    // Remember each roster player's tracker.gg identifier from this
+    // confirmed mapping so the next import can preselect them automatically.
+    for (const [identifier, playerId] of Object.entries(assignments)) {
+      if (!playerId) continue;
+      const rosterPlayer = players.find((p) => p.id === playerId);
+      if (rosterPlayer && rosterPlayer.lastSeenIgn !== identifier) {
+        updatePlayer(playerId, { lastSeenIgn: identifier });
+      }
+    }
     const { startingSide, rounds } = projectRoundsForTeam(result, usTeam, assignments);
     const rawStats: GameStat[] = usPlayers.map((p) => ({
       playerId: assignments[p.identifier] ?? '',

@@ -9,11 +9,8 @@ import type {
   Series,
 } from './types';
 import * as endpoints from './api/endpoints';
-
-const uid = () =>
-  typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2) + Date.now().toString(36);
+import { buildGuestSampleState } from './utils/guestSample';
+import { uid } from './utils/uid';
 
 export function sortSeriesGames(games: Game[]): Game[] {
   return [...games].sort((a, b) => {
@@ -41,12 +38,21 @@ type StoreActions = {
    */
   adminViewing: { userId: string; label: string } | null;
 
+  /**
+   * True while "window shopping" as a guest on locally-generated sample
+   * data. No mutating action syncs to the server or changes state in this
+   * mode — every one of them is a no-op guarded at the top of this file.
+   */
+  guestMode: boolean;
+
   /** Hydrate from the server. Call once after authentication. */
   loadFromServer: () => Promise<void>;
   /** Load another user's data read-only (admin only). */
   loadUserStateAsAdmin: (userId: string, label: string) => Promise<void>;
   /** Leave admin-view mode and reload the admin's own data. */
   exitAdminView: () => Promise<void>;
+  /** Populate local-only sample data for guest mode. No network calls. */
+  loadGuestSample: () => void;
   /** Reset the in-memory state (used on logout). */
   clearLocal: () => void;
 
@@ -125,10 +131,11 @@ export const useStore = create<Store>()((set, get) => ({
   pending: 0,
   syncError: null,
   adminViewing: null,
+  guestMode: false,
 
   loadFromServer: async () => {
     const state = await endpoints.me.state();
-    set({ ...state, hydrated: true, syncError: null, adminViewing: null });
+    set({ ...state, hydrated: true, syncError: null, adminViewing: null, guestMode: false });
   },
   loadUserStateAsAdmin: async (userId, label) => {
     const { state } = await endpoints.admin.userState(userId);
@@ -138,10 +145,22 @@ export const useStore = create<Store>()((set, get) => ({
     const state = await endpoints.me.state();
     set({ ...state, hydrated: true, syncError: null, adminViewing: null });
   },
+  loadGuestSample: () => {
+    const state = buildGuestSampleState();
+    set({ ...state, hydrated: true, syncError: null, adminViewing: null, guestMode: true });
+  },
   clearLocal: () =>
-    set({ ...empty, hydrated: false, pending: 0, syncError: null, adminViewing: null }),
+    set({
+      ...empty,
+      hydrated: false,
+      pending: 0,
+      syncError: null,
+      adminViewing: null,
+      guestMode: false,
+    }),
 
   addRoster: (r) => {
+    if (get().guestMode) return { id: uid(), myRole: 'owner', ...r };
     // The creator is always the owner; reflect that locally so edit controls
     // are enabled before the create round-trip returns.
     const roster: Roster = { id: uid(), myRole: 'owner', ...r };
@@ -153,6 +172,7 @@ export const useStore = create<Store>()((set, get) => ({
     return roster;
   },
   updateRoster: (id, patch) => {
+    if (get().guestMode) return;
     const before = get().rosters.find((r) => r.id === id);
     set((s) => ({
       rosters: s.rosters.map((r) => (r.id === id ? { ...r, ...patch } : r)),
@@ -166,6 +186,7 @@ export const useStore = create<Store>()((set, get) => ({
     });
   },
   setPrimaryRoster: (id) => {
+    if (get().guestMode) return;
     const before = get().rosters;
     if (!before.some((r) => r.id === id)) return;
     // Optimistically mirror the server: exactly one roster is primary. The
@@ -179,6 +200,7 @@ export const useStore = create<Store>()((set, get) => ({
     );
   },
   removeRoster: (id) => {
+    if (get().guestMode) return;
     const snapshot = get();
     // Mirror the server: don't let the user delete their last owned roster.
     const owned = snapshot.rosters.filter((r) => r.myRole === 'owner');
@@ -203,6 +225,7 @@ export const useStore = create<Store>()((set, get) => ({
   },
 
   addPlayer: (p) => {
+    if (get().guestMode) return { id: uid(), ...p };
     const player: Player = { id: uid(), ...p };
     set((s) => ({ players: [...s.players, player] }));
     runSync(endpoints.players.create(player), () =>
@@ -211,6 +234,7 @@ export const useStore = create<Store>()((set, get) => ({
     return player;
   },
   updatePlayer: (id, patch) => {
+    if (get().guestMode) return;
     const before = get().players.find((p) => p.id === id);
     set((s) => ({
       players: s.players.map((p) => (p.id === id ? { ...p, ...patch } : p)),
@@ -224,6 +248,7 @@ export const useStore = create<Store>()((set, get) => ({
     });
   },
   removePlayer: (id) => {
+    if (get().guestMode) return;
     const snapshot = get();
     set((s) => ({
       players: s.players.filter((p) => p.id !== id),
@@ -238,6 +263,7 @@ export const useStore = create<Store>()((set, get) => ({
   },
 
   addSeries: (sIn) => {
+    if (get().guestMode) return { id: uid(), ...sIn };
     const series: Series = { id: uid(), ...sIn };
     set((s) => ({ series: [...s.series, series] }));
     runSync(endpoints.series.create(series), () =>
@@ -246,6 +272,7 @@ export const useStore = create<Store>()((set, get) => ({
     return series;
   },
   updateSeries: (id, patch) => {
+    if (get().guestMode) return;
     const before = get().series.find((x) => x.id === id);
     set((s) => ({
       series: s.series.map((x) => (x.id === id ? { ...x, ...patch } : x)),
@@ -259,6 +286,7 @@ export const useStore = create<Store>()((set, get) => ({
     });
   },
   removeSeries: (id) => {
+    if (get().guestMode) return;
     const snapshot = get();
     set((s) => ({
       series: s.series.filter((x) => x.id !== id),
@@ -270,6 +298,7 @@ export const useStore = create<Store>()((set, get) => ({
   },
 
   addGame: (gIn) => {
+    if (get().guestMode) return { id: uid(), ...gIn };
     let added: Game | null = null;
     set((s) => {
       const seriesGames = s.games.filter((g) => g.seriesId === gIn.seriesId);
@@ -293,6 +322,7 @@ export const useStore = create<Store>()((set, get) => ({
     return newGame;
   },
   updateGame: (id, patch) => {
+    if (get().guestMode) return;
     const before = get().games.find((g) => g.id === id);
     set((s) => ({
       games: s.games.map((g) => (g.id === id ? { ...g, ...patch } : g)),
@@ -306,6 +336,7 @@ export const useStore = create<Store>()((set, get) => ({
     });
   },
   removeGame: (id) => {
+    if (get().guestMode) return;
     const before = get().games.find((g) => g.id === id);
     set((s) => ({ games: s.games.filter((g) => g.id !== id) }));
     runSync(endpoints.games.remove(id), () => {
@@ -314,6 +345,13 @@ export const useStore = create<Store>()((set, get) => ({
   },
 
   addScoutingReport: (rIn) => {
+    if (get().guestMode) {
+      return {
+        id: uid(),
+        createdAt: new Date().toISOString().slice(0, 10),
+        ...rIn,
+      };
+    }
     const report: ScoutingReport = {
       id: uid(),
       createdAt: new Date().toISOString().slice(0, 10),
@@ -328,6 +366,7 @@ export const useStore = create<Store>()((set, get) => ({
     return report;
   },
   updateScoutingReport: (id, patch) => {
+    if (get().guestMode) return;
     const before = get().scoutingReports.find((r) => r.id === id);
     set((s) => ({
       scoutingReports: s.scoutingReports.map((r) =>
@@ -345,6 +384,7 @@ export const useStore = create<Store>()((set, get) => ({
     });
   },
   removeScoutingReport: (id) => {
+    if (get().guestMode) return;
     const before = get().scoutingReports.find((r) => r.id === id);
     set((s) => ({
       scoutingReports: s.scoutingReports.filter((r) => r.id !== id),
@@ -355,6 +395,7 @@ export const useStore = create<Store>()((set, get) => ({
   },
 
   clearAllData: () => {
+    if (get().guestMode) return;
     const snapshot = get();
     // Only rosters this user owns — never delete data belonging to a roster
     // they're just a member of. Deleting a roster cascades its players,
@@ -390,6 +431,7 @@ export const useStore = create<Store>()((set, get) => ({
   },
 
   clearFilteredData: (filter) => {
+    if (get().guestMode) return { series: 0, reports: 0 };
     const snapshot = get();
     const dateInRange = (date: string) =>
       (!filter.startDate || date >= filter.startDate) &&
@@ -441,21 +483,22 @@ export const useStore = create<Store>()((set, get) => ({
 }));
 
 /** Minimal slice the permission selectors need; full Store satisfies it. */
-export type GateState = Pick<Store, 'rosters' | 'series' | 'adminViewing'>;
+export type GateState = Pick<Store, 'rosters' | 'series' | 'adminViewing' | 'guestMode'>;
 
 /**
  * Whether the current user may edit data on the given roster. Owners and
- * editors can; viewers and admin read-only views (myRole undefined) cannot.
+ * editors can; viewers, admin read-only views, and guest mode (myRole
+ * undefined in all three) cannot.
  */
 export function canEditRoster(state: GateState, rosterId: string | undefined): boolean {
-  if (state.adminViewing) return false;
+  if (state.adminViewing || state.guestMode) return false;
   const role = state.rosters.find((r) => r.id === rosterId)?.myRole;
   return role === 'owner' || role === 'editor';
 }
 
 /** Whether the current user owns the roster (for owner-only controls). */
 export function isRosterOwner(state: GateState, rosterId: string | undefined): boolean {
-  if (state.adminViewing) return false;
+  if (state.adminViewing || state.guestMode) return false;
   return state.rosters.find((r) => r.id === rosterId)?.myRole === 'owner';
 }
 

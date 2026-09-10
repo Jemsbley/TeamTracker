@@ -14,7 +14,7 @@ import PageHeader from '../components/PageHeader';
 import { MAPS } from '../constants';
 import { useStore } from '../store';
 import { ALL_ROSTERS, resolveRosterFilter } from '../utils/rosters';
-import { aggregateTeam, gameMatches, type StatFilters } from '../utils/stats';
+import { gameMatches, type StatFilters } from '../utils/stats';
 import type { ValorantMap } from '../types';
 import OverallStatsTab from './stats/OverallStatsTab';
 import WinLossStatsTab from './stats/WinLossStatsTab';
@@ -152,11 +152,6 @@ export default function StatsPage() {
         return true;
       }),
     [rosterScopedGames, startDate, endDate]
-  );
-
-  const team = useMemo(
-    () => aggregateTeam(dateScopedGames, filters),
-    [dateScopedGames, filters]
   );
 
   const filteredGames = useMemo(

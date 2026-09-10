@@ -79,13 +79,15 @@ model RosterMembership {
   @@index([rosterId])
 }
 
-// A shareable invite link tied to a specific player slot on a roster. Accepting
-// it grants the invitee a membership and links their account to the player.
+// A shareable invite link, either tied to a specific player slot on a roster
+// (accepting links the invitee to that player) or, when playerId is null, a
+// "staff" invite that only grants a RosterMembership — for coaches/managers/
+// analysts who need view or edit access without being a player.
 model RosterInvite {
   id         String   @id @default(cuid())
   token      String   @unique
   rosterId   String
-  playerId   String
+  playerId   String?
   role       String   @default("viewer")
   createdBy  String
   acceptedBy String?
@@ -122,6 +124,10 @@ model Player {
   isMainRoster Boolean
   // Real user account connected to this player slot via an accepted invite.
   linkedUserId String?
+  // Tracker.gg identifier (e.g. "Generator#9393") this player was most
+  // recently assigned to during a match import. Used only to preselect the
+  // team/player match on the next import — never surfaced in the UI.
+  lastSeenIgn  String?
 
   user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
   roster Roster @relation(fields: [rosterId], references: [id], onDelete: Cascade)

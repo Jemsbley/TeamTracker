@@ -1,13 +1,9 @@
 import { MAPS } from '../constants';
 import type { Game, Player, ValorantMap } from '../types';
-import { deriveScore } from './rounds';
+import { effectiveScore } from './rounds';
 
 function gameWinForUs(g: Game): boolean | undefined {
-  const sc =
-    deriveScore(g) ??
-    (g.scoreFor !== undefined && g.scoreAgainst !== undefined
-      ? ([g.scoreFor, g.scoreAgainst] as [number, number])
-      : undefined);
+  const sc = effectiveScore(g);
   if (!sc) return undefined;
   if (sc[0] > sc[1]) return true;
   if (sc[0] < sc[1]) return false;

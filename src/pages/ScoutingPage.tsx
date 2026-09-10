@@ -14,7 +14,8 @@ export default function ScoutingPage() {
   const removeScoutingReport = useStore((s) => s.removeScoutingReport);
   const series = useStore((s) => s.series);
   const adminViewing = useStore((s) => s.adminViewing);
-  const gate = { rosters, series, adminViewing };
+  const guestMode = useStore((s) => s.guestMode);
+  const gate = { rosters, series, adminViewing, guestMode };
   const navigate = useNavigate();
 
   const [teamName, setTeamName] = useState('');

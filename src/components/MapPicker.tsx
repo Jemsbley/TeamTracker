@@ -10,6 +10,9 @@ type Props = {
   placeholder?: string;
   includeEmpty?: boolean;
   emptyLabel?: string;
+  /** Maps to show grayed out and unselectable — e.g. no data loaded for them
+   * under the page's current filters. */
+  disabledMaps?: ReadonlySet<ValorantMap>;
 };
 
 export default function MapPicker({
@@ -19,6 +22,7 @@ export default function MapPicker({
   placeholder = '— Map —',
   includeEmpty,
   emptyLabel = 'All maps',
+  disabledMaps,
 }: Props) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -79,19 +83,30 @@ export default function MapPicker({
               <span>{emptyLabel}</span>
             </button>
           )}
-          {MAPS.map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => select(m)}
-              className={`w-full text-left flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-valorant-panel2 ${
-                m === value ? 'bg-valorant-panel2' : ''
-              }`}
-            >
-              <MapIcon map={m} width={28} height={18} />
-              <span>{m}</span>
-            </button>
-          ))}
+          {MAPS.map((m) => {
+            const disabled = disabledMaps?.has(m);
+            return (
+              <button
+                key={m}
+                type="button"
+                disabled={disabled}
+                onClick={() => select(m)}
+                className={`w-full text-left flex items-center gap-2 px-3 py-1.5 text-sm ${
+                  disabled
+                    ? 'opacity-40 cursor-not-allowed'
+                    : 'hover:bg-valorant-panel2'
+                } ${m === value ? 'bg-valorant-panel2' : ''}`}
+              >
+                <MapIcon map={m} width={28} height={18} />
+                <span>{m}</span>
+                {disabled && (
+                  <span className="ml-auto text-[10px] text-valorant-muted">
+                    No data
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

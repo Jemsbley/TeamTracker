@@ -18,6 +18,7 @@ import SettingsPage from './pages/SettingsPage';
 import AdminPage from './pages/AdminPage';
 import InvitePage from './pages/InvitePage';
 import AccountInvitePage from './pages/AccountInvitePage';
+import HeatmapPage from './pages/HeatmapPage';
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<StatsPage />} />
           <Route path="maps" element={<MapsPage />} />
+          <Route path="heatmap" element={<HeatmapPage />} />
           <Route path="agents" element={<AgentsPage />} />
           <Route path="players" element={<PlayersPage />} />
           <Route path="roster" element={<RosterPage />} />

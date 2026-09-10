@@ -7,10 +7,13 @@ import { useAuth } from '../authStore';
 export default function LoginPage() {
   const status = useAuth((s) => s.status);
   const loginWithGoogle = useAuth((s) => s.loginWithGoogle);
+  const enterGuestMode = useAuth((s) => s.enterGuestMode);
   const [error, setError] = useState<string | null>(null);
   const nav = useNavigate();
 
-  if (status === 'authenticated') return <Navigate to="/" replace />;
+  if (status === 'authenticated' || status === 'guest') {
+    return <Navigate to="/" replace />;
+  }
 
   const clientConfigured = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
@@ -54,6 +57,19 @@ export default function LoginPage() {
         )}
 
         {error && <p className="text-sm text-red-400">{error}</p>}
+
+        <div className="pt-2 border-t border-white/5">
+          <button
+            type="button"
+            onClick={() => {
+              enterGuestMode();
+              nav('/', { replace: true });
+            }}
+            className="text-sm text-valorant-muted hover:text-valorant-accent underline"
+          >
+            I'm a guest — browse sample data
+          </button>
+        </div>
       </div>
     </div>
   );

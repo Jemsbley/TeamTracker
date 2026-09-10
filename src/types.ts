@@ -65,6 +65,12 @@ export type Player = {
   isMainRoster: boolean;
   /** Real user account linked to this player slot via an accepted invite. */
   linkedUserId?: string | null;
+  /**
+   * Tracker.gg identifier (e.g. "Generator#9393") this player was most
+   * recently matched to during a match import. Backend-only bookkeeping for
+   * preselecting future imports — never render this in the UI.
+   */
+  lastSeenIgn?: string | null;
 };
 
 export type SeriesFormat = 'BO1' | 'BO3' | 'BO5';
