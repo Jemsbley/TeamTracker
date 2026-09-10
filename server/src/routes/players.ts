@@ -10,6 +10,9 @@ const playerBody = z.object({
   rosterId: z.string().min(1),
   name: z.string().min(1).max(200),
   isMainRoster: z.boolean(),
+  // Tracker.gg identifier this player was most recently matched to during a
+  // match import; used only to preselect matches on future imports.
+  lastSeenIgn: z.string().max(200).nullable().optional(),
 });
 
 const playerCreate = playerBody.extend({ id: z.string().min(1).max(64).optional() });

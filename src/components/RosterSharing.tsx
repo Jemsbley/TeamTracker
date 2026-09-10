@@ -18,6 +18,8 @@ export default function RosterSharing({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [staffRole, setStaffRole] = useState<'editor' | 'viewer'>('viewer');
+  const [staffCopied, setStaffCopied] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -68,13 +70,29 @@ export default function RosterSharing({
     }
   };
 
+  // Staff invites skip the player slot entirely — just a RosterMembership
+  // at the chosen role, for coaches/managers/analysts who aren't a player.
+  const copyStaffInvite = async () => {
+    setError(null);
+    try {
+      const invite = await invites.create(rosterId, null, staffRole);
+      const url = `${window.location.origin}/invite/${invite.token}`;
+      await navigator.clipboard.writeText(url);
+      setStaffCopied(true);
+      setTimeout(() => setStaffCopied(false), 2000);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
   return (
     <div className="card space-y-5">
       <div>
         <h3 className="font-semibold">Members &amp; sharing</h3>
         <p className="text-xs text-valorant-muted">
-          Send a player's invite link to connect their account. Invited users
-          start view-only — promote them to Editor to grant write access.
+          Send a player's invite link to connect their account, or invite
+          staff who need access without a player slot. Invited users start
+          view-only — promote them to Editor to grant write access.
         </p>
       </div>
 
@@ -151,6 +169,33 @@ export default function RosterSharing({
             </div>
           ))
         )}
+      </div>
+
+      {/* Staff invite — access without a player slot */}
+      <div className="space-y-2">
+        <div className="text-xs uppercase tracking-wide text-valorant-muted">
+          Invite staff
+        </div>
+        <p className="text-xs text-valorant-muted">
+          For coaches, managers, or analysts who need access but aren't a
+          player or sub on this roster.
+        </p>
+        <div className="flex items-center gap-2">
+          <select
+            value={staffRole}
+            onChange={(e) => setStaffRole(e.target.value as 'editor' | 'viewer')}
+            className="bg-valorant-panel2 border border-white/10 rounded px-2 py-1 text-sm"
+          >
+            <option value="viewer">Viewer</option>
+            <option value="editor">Editor</option>
+          </select>
+          <button
+            onClick={copyStaffInvite}
+            className="px-2 py-1 rounded text-xs text-valorant-accent hover:bg-valorant-panel2 border border-white/10"
+          >
+            {staffCopied ? 'Copied link!' : 'Copy invite link'}
+          </button>
+        </div>
       </div>
     </div>
   );

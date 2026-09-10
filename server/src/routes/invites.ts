@@ -12,7 +12,9 @@ import { requireRosterAccess } from '../access.js';
 export const rosterInvitesRouter = Router({ mergeParams: true });
 
 const createSchema = z.object({
-  playerId: z.string().min(1),
+  // Omitted/undefined = a "staff" invite: grants a RosterMembership only,
+  // with no player slot attached.
+  playerId: z.string().min(1).optional(),
   role: z.enum(['editor', 'viewer']).optional(),
 });
 
@@ -36,14 +38,16 @@ rosterInvitesRouter.post(
     await requireRosterAccess(req.userId!, rosterId, 'editor');
     const { playerId, role } = createSchema.parse(req.body);
 
-    const player = await prisma.player.findFirst({ where: { id: playerId, rosterId } });
-    if (!player) throw new HttpError(404, 'Player not found on this roster');
+    if (playerId) {
+      const player = await prisma.player.findFirst({ where: { id: playerId, rosterId } });
+      if (!player) throw new HttpError(404, 'Player not found on this roster');
+    }
 
     const invite = await prisma.rosterInvite.create({
       data: {
         token: randomUUID(),
         rosterId,
-        playerId,
+        playerId: playerId ?? null,
         role: role ?? 'viewer',
         createdBy: req.userId!,
       },
@@ -67,11 +71,13 @@ invitesRouter.get(
     if (!invite) throw new HttpError(404, 'Invite not found or expired');
     const [roster, player] = await Promise.all([
       prisma.roster.findUnique({ where: { id: invite.rosterId }, select: { name: true } }),
-      prisma.player.findUnique({ where: { id: invite.playerId }, select: { name: true } }),
+      invite.playerId
+        ? prisma.player.findUnique({ where: { id: invite.playerId }, select: { name: true } })
+        : Promise.resolve(null),
     ]);
     res.json({
       rosterName: roster?.name ?? 'Unknown roster',
-      playerName: player?.name ?? 'Unknown player',
+      playerName: invite.playerId ? (player?.name ?? 'Unknown player') : null,
       role: invite.role,
       accepted: invite.acceptedBy !== null,
     });
@@ -101,11 +107,14 @@ invitesRouter.post(
           data: { rosterId: invite.rosterId, userId, role: invite.role },
         });
       }
-      // Link this user to the player slot the invite was for.
-      await tx.player.update({
-        where: { id: invite.playerId },
-        data: { linkedUserId: userId },
-      });
+      // Link this user to the player slot the invite was for, if any — staff
+      // invites (playerId null) skip this and only grant the membership.
+      if (invite.playerId) {
+        await tx.player.update({
+          where: { id: invite.playerId },
+          data: { linkedUserId: userId },
+        });
+      }
       await tx.rosterInvite.update({
         where: { id: invite.id },
         data: { acceptedBy: userId },

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.5",
+    "fastest-levenshtein": "^1.0.16",
     "nuqs": "^2.8.9",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

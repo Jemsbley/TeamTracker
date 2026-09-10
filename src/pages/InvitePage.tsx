@@ -85,8 +85,16 @@ export default function InvitePage() {
           <>
             <p className="text-sm text-valorant-muted">
               You've been invited to join the roster{' '}
-              <strong className="text-white">{info.rosterName}</strong> as{' '}
-              <strong className="text-white">{info.playerName}</strong>.
+              <strong className="text-white">{info.rosterName}</strong>
+              {info.playerName ? (
+                <>
+                  {' '}
+                  as <strong className="text-white">{info.playerName}</strong>
+                </>
+              ) : (
+                ' as staff'
+              )}
+              .
             </p>
             <p className="text-xs text-valorant-muted">
               You'll get {info.role === 'editor' ? 'edit' : 'view-only'} access to

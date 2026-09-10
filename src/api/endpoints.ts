@@ -74,7 +74,8 @@ export type Invite = {
   id: string;
   token: string;
   rosterId: string;
-  playerId: string;
+  /** null = a "staff" invite — grants a membership only, no player slot. */
+  playerId: string | null;
   role: Role;
   acceptedBy: string | null;
   createdAt: string;
@@ -82,16 +83,17 @@ export type Invite = {
 
 export type InviteInfo = {
   rosterName: string;
-  playerName: string;
+  /** null for staff invites (no player slot attached). */
+  playerName: string | null;
   role: Role;
   accepted: boolean;
 };
 
 export const invites = {
-  create: (rosterId: string, playerId: string, role?: 'editor' | 'viewer') =>
+  create: (rosterId: string, playerId: string | null, role?: 'editor' | 'viewer') =>
     api<Invite>(`/rosters/${rosterId}/invites`, {
       method: 'POST',
-      body: { playerId, role },
+      body: { playerId: playerId ?? undefined, role },
     }),
   listForRoster: (rosterId: string) => api<Invite[]>(`/rosters/${rosterId}/invites`),
   info: (token: string) => api<InviteInfo>(`/invites/${token}`),

@@ -44,7 +44,7 @@ const uid = () =>
     ? crypto.randomUUID()
     : Math.random().toString(36).slice(2) + Date.now().toString(36);
 
-function rand<T>(arr: T[]): T {
+export function rand<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 function randInt(min: number, max: number): number {
@@ -53,7 +53,7 @@ function randInt(min: number, max: number): number {
 function randFloat(min: number, max: number): number {
   return Math.random() * (max - min) + min;
 }
-function shuffle<T>(arr: T[]): T[] {
+export function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -261,24 +261,18 @@ function genPickBan(format: SeriesFormat): SeriesPickBan {
   return { pool, team1, moves, deciderSide };
 }
 
-export function generateMockSeries(rosterId: string): {
-  added: { series: number; games: number; otGames: number };
-} {
-  const state = useStore.getState();
-  if (!state.rosters.find((r) => r.id === rosterId)) {
-    throw new Error('Roster not found.');
-  }
-  const players = state.players.filter((p) => p.rosterId === rosterId);
-  if (players.length < 5) {
-    throw new Error('Need at least 5 players in this roster.');
-  }
-
-  // Build baselines from games tied to series in this roster
-  const rosterSeriesIds = new Set(
-    state.series.filter((s) => s.rosterId === rosterId).map((s) => s.id)
-  );
-  const rosterGames = state.games.filter((g) => rosterSeriesIds.has(g.seriesId));
-  const baselines = computeBaselines(players, rosterGames);
+/**
+ * Pure generation of a season's worth of series/games for a roster's lineup.
+ * Takes no dependency on the store, so it can be reused for both the
+ * server-synced dev seeding flow (generateMockSeries) and local-only sample
+ * data (guest mode).
+ */
+export function buildMockSeriesAndGames(
+  rosterId: string,
+  players: Player[],
+  existingGames: Game[]
+): { series: Series[]; games: Game[]; otGames: number } {
+  const baselines = computeBaselines(players, existingGames);
 
   // Build a stable lineup from main roster, padded with subs if needed.
   const mainIds = players.filter((p) => p.isMainRoster).map((p) => p.id);
@@ -353,6 +347,33 @@ export function generateMockSeries(rosterId: string): {
     g.rounds = genOvertime(winnerIsUs, g.startingSide ?? 'Attack');
   }
 
+  return { series: newSeries, games: newGames, otGames: indices.length };
+}
+
+export function generateMockSeries(rosterId: string): {
+  added: { series: number; games: number; otGames: number };
+} {
+  const state = useStore.getState();
+  if (!state.rosters.find((r) => r.id === rosterId)) {
+    throw new Error('Roster not found.');
+  }
+  const players = state.players.filter((p) => p.rosterId === rosterId);
+  if (players.length < 5) {
+    throw new Error('Need at least 5 players in this roster.');
+  }
+
+  // Build baselines from games tied to series in this roster
+  const rosterSeriesIds = new Set(
+    state.series.filter((s) => s.rosterId === rosterId).map((s) => s.id)
+  );
+  const rosterGames = state.games.filter((g) => rosterSeriesIds.has(g.seriesId));
+
+  const { series: newSeries, games: newGames, otGames } = buildMockSeriesAndGames(
+    rosterId,
+    players,
+    rosterGames
+  );
+
   // Persist via the store actions so the server stays in sync. We add each
   // series, then map the local seriesId placeholder to the real id returned
   // by addSeries before adding the games that belong to it.
@@ -374,7 +395,7 @@ export function generateMockSeries(rosterId: string): {
     added: {
       series: newSeries.length,
       games: newGames.length,
-      otGames: targetOT,
+      otGames,
     },
   };
 }
