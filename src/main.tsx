@@ -8,7 +8,7 @@ import generatorLogo from './assets/icons/generator.png';
 import { useAuth } from './authStore';
 import './index.css';
 
-// Set the browser tab favicon to the nut logo (works in dev and prod
+// Set the browser tab favicon to the generator logo (works in dev and prod
 // builds because Vite resolves the import to the bundled asset URL).
 {
   const existing = document.querySelectorAll('link[rel~="icon"]');

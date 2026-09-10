@@ -307,6 +307,16 @@ export function deriveScore(game: Game): [number, number] | undefined {
   return [f, a];
 }
 
+/** Score [our, opponent], preferring round data and falling back to the manual final score. */
+export function effectiveScore(game: Game): [number, number] | undefined {
+  return (
+    deriveScore(game) ??
+    (game.scoreFor !== undefined && game.scoreAgainst !== undefined
+      ? ([game.scoreFor, game.scoreAgainst] as [number, number])
+      : undefined)
+  );
+}
+
 /**
  * True if the running score ever equaled (us, them) at some point during the
  * map — not just at the final score. Falls back to comparing the final
@@ -335,10 +345,6 @@ export function scorelineOccurred(game: Game, us: number, them: number): boolean
 export function pct(wins: number, total: number, digits = 0): string {
   if (!total) return '–';
   return `${((wins / total) * 100).toFixed(digits)}%`;
-}
-
-export function makeBlankRound(): Round {
-  return { result: undefined, firstBlood: undefined };
 }
 
 /**

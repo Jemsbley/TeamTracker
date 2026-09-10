@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma.js';
-import { asyncHandler, HttpError, uid } from '../util.js';
+import { asyncHandler, HttpError, uid, stripUserId } from '../util.js';
 import { requireRosterAccess, memberRosterIds } from '../access.js';
 
 export const scoutingReportsRouter = Router();
@@ -23,7 +23,6 @@ const reportCreate = reportBody.extend({ id: z.string().min(1).max(64).optional(
 
 const reportPatch = reportBody.partial();
 
-const strip = ({ userId: _u, ...rest }: { userId: string | null }) => rest;
 
 scoutingReportsRouter.get(
   '/',
@@ -34,7 +33,7 @@ scoutingReportsRouter.get(
       // Reports attached to a roster I belong to, plus my own unattached ones.
       where: { OR: [{ rosterId: { in: rosterIds } }, { rosterId: null, userId }] },
     });
-    res.json(reports.map(strip));
+    res.json(reports.map(stripUserId));
   })
 );
 
@@ -48,7 +47,7 @@ scoutingReportsRouter.post(
     const created = await prisma.scoutingReport.create({
       data: { id: id ?? uid(), userId: req.userId!, ...data },
     });
-    res.status(201).json(strip(created));
+    res.status(201).json(stripUserId(created));
   })
 );
 
@@ -84,7 +83,7 @@ scoutingReportsRouter.patch(
       where: { id: existing.id },
       data: patch,
     });
-    res.json(strip(updated));
+    res.json(stripUserId(updated));
   })
 );
 

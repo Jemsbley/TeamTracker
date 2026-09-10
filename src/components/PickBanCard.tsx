@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { MAPS } from '../constants';
 import { useStore, canEditSeries } from '../store';
 import WriteButton, { WRITE_TOOLTIP } from './WriteButton';
-import type { Series, SeriesFormat, SeriesPickBan, Side, ValorantMap } from '../types';
+import type { Series, SeriesPickBan, Side, ValorantMap } from '../types';
 import {
   DECIDER_SIDE_TEAM,
   PICKBAN_STEPS,

@@ -1,6 +1,3 @@
-import type { AgentClass } from '../types';
-import { AGENT_CLASS } from '../constants';
-
 export type Team = 'Blue' | 'Red';
 export type Side = 'attacker' | 'defender';
 export type EventKind = 'kill' | 'death';
@@ -235,8 +232,4 @@ export function gameToImageUV(
     u: y * mapDetails.xMultiplier + mapDetails.xScalarToAdd,
     v: x * mapDetails.yMultiplier + mapDetails.yScalarToAdd,
   };
-}
-
-export function agentClassOf(agent: string): AgentClass | undefined {
-  return AGENT_CLASS[agent];
 }

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma.js';
-import { asyncHandler, HttpError, uid } from '../util.js';
+import { asyncHandler, HttpError, uid, stripUserId } from '../util.js';
 import { requireRosterAccess, memberRosterIds } from '../access.js';
 
 export const seriesRouter = Router();
@@ -29,7 +29,6 @@ const seriesCreate = seriesBody.extend({ id: z.string().min(1).max(64).optional(
 
 const seriesPatch = seriesBody.partial();
 
-const strip = ({ userId: _u, ...rest }: { userId: string | null }) => rest;
 
 seriesRouter.get(
   '/',
@@ -38,7 +37,7 @@ seriesRouter.get(
     const series = await prisma.series.findMany({
       where: { rosterId: { in: rosterIds } },
     });
-    res.json(series.map(strip));
+    res.json(series.map(stripUserId));
   })
 );
 
@@ -50,7 +49,7 @@ seriesRouter.post(
     const created = await prisma.series.create({
       data: { id: id ?? uid(), userId: req.userId!, ...data },
     });
-    res.status(201).json(strip(created));
+    res.status(201).json(stripUserId(created));
   })
 );
 
@@ -68,7 +67,7 @@ seriesRouter.patch(
       where: { id: existing.id },
       data: patch,
     });
-    res.json(strip(updated));
+    res.json(stripUserId(updated));
   })
 );
 

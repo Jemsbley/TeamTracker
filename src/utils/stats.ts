@@ -1,5 +1,5 @@
 import type { Game, GameStat, Series, ValorantMap } from '../types';
-import { deriveScore } from './rounds';
+import { effectiveScore } from './rounds';
 
 export type StatFilters = {
   map?: ValorantMap | 'all';
@@ -169,11 +169,7 @@ export const STAT_DEFS: StatDef[] = [
 ];
 
 export function gameOutcome(g: Game): 'W' | 'L' | undefined {
-  const sc =
-    deriveScore(g) ??
-    (g.scoreFor !== undefined && g.scoreAgainst !== undefined
-      ? ([g.scoreFor, g.scoreAgainst] as [number, number])
-      : undefined);
+  const sc = effectiveScore(g);
   if (!sc) return undefined;
   if (sc[0] > sc[1]) return 'W';
   if (sc[0] < sc[1]) return 'L';

@@ -1,11 +1,7 @@
 import { MAPS } from '../constants';
 import type { AppState, Player, Roster, ScoutingReport, ValorantMap } from '../types';
 import { buildMockSeriesAndGames, shuffle } from './mockSeed';
-
-const uid = () =>
-  typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2) + Date.now().toString(36);
+import { uid } from './uid';
 
 const GUEST_ROSTER_NAME = 'Sample Roster';
 const GUEST_PLAYER_NAMES = ['Zeta', 'Nova', 'Rift', 'Vex', 'Onyx'];

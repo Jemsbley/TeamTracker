@@ -1,4 +1,4 @@
-import { AGENTS_BY_CLASS, MAPS } from '../constants';
+import { ALL_AGENTS, MAPS } from '../constants';
 import {
   FORMAT_TO_WIN,
   type Game,
@@ -13,8 +13,7 @@ import {
 } from '../types';
 import { useStore } from '../store';
 import { PICKBAN_STEPS, playedMaps } from './pickBan';
-
-const ALL_AGENTS = Object.values(AGENTS_BY_CLASS).flat();
+import { uid } from './uid';
 
 const OPPONENTS = [
   'Lesley University',
@@ -38,11 +37,6 @@ const OPPONENTS = [
   'NEU Black',
   'BU Crimson',
 ];
-
-const uid = () =>
-  typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 export function rand<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];

@@ -1,17 +1,13 @@
 import type { Game, Series, SeriesFormat } from '../types';
 import { FORMAT_TO_WIN } from '../types';
-import { deriveScore } from './rounds';
+import { effectiveScore } from './rounds';
 
 /** Returns [our map wins, opponent map wins] across decided games. */
 export function mapScore(games: Game[]): [number, number] {
   let w = 0;
   let l = 0;
   for (const g of games) {
-    const sc =
-      deriveScore(g) ??
-      (g.scoreFor !== undefined && g.scoreAgainst !== undefined
-        ? ([g.scoreFor, g.scoreAgainst] as [number, number])
-        : undefined);
+    const sc = effectiveScore(g);
     if (!sc) continue;
     if (sc[0] > sc[1]) w += 1;
     else if (sc[0] < sc[1]) l += 1;

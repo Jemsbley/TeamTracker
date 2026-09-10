@@ -10,11 +10,7 @@ import type {
 } from './types';
 import * as endpoints from './api/endpoints';
 import { buildGuestSampleState } from './utils/guestSample';
-
-const uid = () =>
-  typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2) + Date.now().toString(36);
+import { uid } from './utils/uid';
 
 export function sortSeriesGames(games: Game[]): Game[] {
   return [...games].sort((a, b) => {

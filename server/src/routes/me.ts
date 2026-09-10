@@ -45,7 +45,15 @@ meRouter.patch(
 meRouter.delete(
   '/',
   asyncHandler(async (req, res) => {
-    await prisma.user.delete({ where: { id: req.userId! } });
+    await prisma.$transaction([
+      // Unlink any player slots this user occupied on rosters they don't own
+      // (no FK on linkedUserId, so this doesn't cascade on its own).
+      prisma.player.updateMany({
+        where: { linkedUserId: req.userId! },
+        data: { linkedUserId: null },
+      }),
+      prisma.user.delete({ where: { id: req.userId! } }),
+    ]);
     res.status(204).end();
   })
 );

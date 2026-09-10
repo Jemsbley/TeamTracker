@@ -1,7 +1,12 @@
+import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import generatorLogo from '../assets/icons/generator.png';
 import { useAuth } from '../authStore';
 import { useStore } from '../store';
+import ChangelogModal from './ChangelogModal';
+import { CHANGELOG } from '../utils/changelog';
+
+const CURRENT_VERSION = CHANGELOG[0].version;
 
 const linkBase =
   'px-3 py-1.5 rounded-md text-sm font-semibold transition-colors';
@@ -28,6 +33,7 @@ export default function AppHeader() {
   const adminViewing = useStore((s) => s.adminViewing);
   const exitAdminView = useStore((s) => s.exitAdminView);
   const navigate = useNavigate();
+  const [showChangelog, setShowChangelog] = useState(false);
 
   const onLogout = () => {
     logout();
@@ -52,6 +58,14 @@ export default function AppHeader() {
               Generator's University Team Tracking System
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setShowChangelog(true)}
+            className="shrink-0 rounded-full border border-purple-500/30 bg-purple-500/20 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-purple-300 hover:text-white hover:border-purple-400/50"
+            title="View version history"
+          >
+            v{CURRENT_VERSION}
+          </button>
         </div>
         <nav className="flex items-center gap-1 justify-self-center">
           <NavLink to="/" end className={nav}>
@@ -149,6 +163,7 @@ export default function AppHeader() {
           Sync error: {syncError}
         </div>
       )}
+      {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
     </header>
   );
 }
