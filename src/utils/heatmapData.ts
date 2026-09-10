@@ -47,9 +47,8 @@ export type HeatmapMatch = {
   events: HeatmapEvent[];
 };
 
-/** Shape of the raw tracker.gg match export dropped in
- * public/samples/havens — just the fields the heatmap page reads out
- * of the much larger `segments` array. */
+/** Shape of the raw tracker.gg match export — just the fields the
+ * heatmap page reads out of the much larger `segments` array. */
 type RawSegment = {
   type: string;
   attributes: Record<string, unknown>;
