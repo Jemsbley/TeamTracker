@@ -1,0 +1,29 @@
+# Generator's University Team Tracking System
+#
+# The public, crawlable surface of this site is the landing page plus the
+# about / privacy / terms pages. Everything else sits behind Google sign-in and
+# would only ever serve a redirect to the login screen, so crawlers are asked
+# to skip it rather than index a wall of auth redirects.
+
+User-agent: *
+Allow: /
+Allow: /about
+Allow: /privacy
+Allow: /terms
+Allow: /login
+
+# Authenticated application routes — no content is served here without a
+# session.
+Disallow: /onboarding
+Disallow: /signup
+Disallow: /invite/
+Disallow: /maps
+Disallow: /agents
+Disallow: /players
+Disallow: /roster
+Disallow: /settings
+Disallow: /admin
+Disallow: /scouting
+Disallow: /series
+
+Sitemap: https://tracker.jemsbley.dev/sitemap.xml

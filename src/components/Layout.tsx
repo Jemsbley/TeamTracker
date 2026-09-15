@@ -10,8 +10,21 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      <footer className="text-center text-xs text-valorant-muted py-3">
-        Synced to your account · accessible from any device
+      <footer className="text-center text-xs text-valorant-muted py-3 space-y-1">
+        <p>Synced to your account · accessible from any device</p>
+        {/* Plain anchors, not <Link>: the public info pages are standalone
+            static HTML served outside the SPA. */}
+        <p className="flex flex-wrap justify-center gap-x-4">
+          <a href="/about" className="hover:text-valorant-accent">
+            About
+          </a>
+          <a href="/privacy" className="hover:text-valorant-accent">
+            Privacy
+          </a>
+          <a href="/terms" className="hover:text-valorant-accent">
+            Terms
+          </a>
+        </p>
       </footer>
     </div>
   );

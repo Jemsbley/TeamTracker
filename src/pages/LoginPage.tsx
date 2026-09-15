@@ -21,7 +21,8 @@ export default function LoginPage() {
         <div className="space-y-1">
           <h1 className="text-xl font-semibold">Generator's University Team Tracking System</h1>
           <p className="text-sm text-valorant-muted">
-            Sign in with your Google account to continue.
+            Match tracking and analytics for competitive Valorant teams. Sign
+            in with your Google account to continue.
           </p>
         </div>
 
@@ -54,6 +55,20 @@ export default function LoginPage() {
         )}
 
         {error && <p className="text-sm text-red-400">{error}</p>}
+
+        {/* Public info pages. Plain anchors, not <Link>: these are standalone
+            static HTML pages served outside the SPA. */}
+        <div className="pt-2 border-t border-white/5 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-valorant-muted">
+          <a href="/about" className="hover:text-valorant-accent">
+            About
+          </a>
+          <a href="/privacy" className="hover:text-valorant-accent">
+            Privacy
+          </a>
+          <a href="/terms" className="hover:text-valorant-accent">
+            Terms
+          </a>
+        </div>
       </div>
     </div>
   );
