@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { CHANGELOG } from '../utils/changelog';
+import { CHANGELOG, formatReleaseDate } from '../utils/changelog';
 
 type Props = {
   onClose: () => void;
@@ -37,6 +37,9 @@ export default function ChangelogModal({ onClose }: Props) {
               <div className="flex items-baseline gap-2">
                 <span className="font-semibold tabular-nums text-white">v{entry.version}</span>
                 <span className="text-sm text-emerald-400">{entry.title}</span>
+                <span className="ml-auto shrink-0 text-xs text-valorant-muted whitespace-nowrap">
+                  {formatReleaseDate(entry.date)}
+                </span>
               </div>
               {entry.changes.length > 0 && (
                 <ul className="list-disc list-inside space-y-0.5 text-sm text-valorant-muted">

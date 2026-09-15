@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import generatorLogo from '../assets/icons/generator.png';
+import { useAuth } from '../authStore';
 
 /**
  * Public landing page, shown at `/` to visitors who aren't signed in.
@@ -26,6 +27,11 @@ const FEATURES: { title: string; body: string }[] = [
       'Win rates, attack/defense splits, and composition performance broken out by map.',
   },
   {
+    title: 'Positioning heatmaps',
+    body:
+      'Visualize where kills and deaths happen across each map.',
+  },
+  {
     title: 'Player breakdowns',
     body:
       'Per-player stats filtered by map, agent, role, and date range.',
@@ -36,33 +42,38 @@ const FEATURES: { title: string; body: string }[] = [
       'Build and review pick/ban sequences against a specific opponent.',
   },
   {
-    title: 'VOD review',
+    title: 'VOD review and scouting',
     body:
-      'Attach match videos and written review notes to the series they belong to.',
-  },
-  {
-    title: 'Opponent scouting',
-    body:
-      'Keep scouting reports next to an opponent’s map and agent tendencies.',
+      'Attach match videos and review notes, and keep scouting reports next to an opponent’s tendencies.',
   },
 ];
 
 export default function LandingPage() {
+  const enterGuestMode = useAuth((s) => s.enterGuestMode);
+
   return (
     <div className="min-h-screen bg-valorant-dark text-valorant-accent">
-      <div className="max-w-3xl mx-auto px-6 py-10">
-        <header className="flex items-center gap-3 pb-6 border-b border-white/5">
+      {/* Sticky so the app name and a way in stay reachable at any scroll
+          position. Mirrors AppHeader's treatment. Title truncates and the
+          button never shrinks, so this stays a single row at any width. */}
+      <header className="sticky top-0 z-10 border-b border-white/5 bg-valorant-panel/80 backdrop-blur">
+        <div className="max-w-3xl mx-auto px-6 py-3 flex items-center gap-3">
           <img
             src={generatorLogo}
             alt=""
-            className="h-9 w-9 object-contain shrink-0"
+            className="h-8 w-8 object-contain shrink-0"
           />
-          <span className="font-semibold tracking-wide">
+          <span className="font-semibold tracking-wide truncate">
             Generator&rsquo;s University Team Tracking System
           </span>
-        </header>
+          <Link to="/login" className="btn-primary ml-auto shrink-0">
+            Sign in
+          </Link>
+        </div>
+      </header>
 
-        <h1 className="text-3xl font-semibold mt-10 leading-tight">
+      <div className="max-w-3xl mx-auto px-6 py-10">
+        <h1 className="text-3xl font-semibold leading-tight">
           Match tracking and analytics for competitive Valorant teams.
         </h1>
 
@@ -100,11 +111,25 @@ export default function LandingPage() {
         <p className="mt-2 leading-relaxed">
           Access is granted by invitation from a roster owner. If you&rsquo;re
           on a team that uses this tool, ask your roster owner for an invite
-          link. If you already have an account, sign in with Google.
+          link. If you already have an account, sign in with Google. You can
+          also look around with generated sample data first.
         </p>
-        <Link to="/login" className="btn-primary mt-4 px-5 py-2.5">
-          Sign in
-        </Link>
+
+        {/* Guest mode drops straight into the app on locally-generated sample
+            data — no navigation needed, since AuthGuard re-renders this route
+            once the status flips to 'guest'. */}
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <Link to="/login" className="btn-primary px-5 py-2.5">
+            Sign in
+          </Link>
+          <button
+            type="button"
+            onClick={enterGuestMode}
+            className="btn-ghost px-5 py-2.5"
+          >
+            I&rsquo;m a guest — browse sample data
+          </button>
+        </div>
 
         <footer className="mt-12 pt-6 border-t border-white/5 text-xs text-valorant-muted space-y-3">
           {/* Plain anchors, not <Link>: these are standalone static HTML

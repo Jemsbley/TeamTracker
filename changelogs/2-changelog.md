@@ -6,9 +6,31 @@ without an account). This is step 1 of the Palo Alto remediation: it does not
 touch the NRD timer (which expires on its own) and it does not submit the
 category change request (that comes after this ships).
 
-Version bumped `0.1.0` → `0.2.0`.
+Version `1.1.0` → `1.1.1`, with a matching entry at the top of
+`src/utils/changelog.ts` so the in-app version chip shows it.
 
 ---
+
+## Branch base
+
+This branch started from `cc6514f`, which was **4 commits behind
+`origin/main`**. `origin/main` was merged in (commit `548b916`) partway
+through the work, which brought in the heatmap page, the version chip and
+`src/utils/changelog.ts`, and — relevant here — **guest mode**, which was never
+missing, just absent from the stale base.
+
+Three conflicts, resolved as follows:
+
+- **`package.json`** — took upstream's `1.1.0` over a mistaken `0.2.0` bump
+  made against the stale base, then bumped properly to `1.1.1`.
+- **`src/main.tsx`** — kept the static `<link rel="icon">` approach over
+  upstream's JS favicon injection (see below).
+- **`src/pages/LoginPage.tsx`** — kept **both** sides: upstream's guest-mode
+  button and this branch's About/Privacy/Terms links.
+
+`src/components/AuthGuard.tsx` auto-merged cleanly; upstream's guest sample
+loading and guest route restrictions now sit alongside the landing-page branch
+for `/`.
 
 ## The problem, concretely
 
@@ -30,9 +52,9 @@ displaying any other content suggesting a different categorization."* The
 `High-Risk` rating is largely downstream of this, since sites in `Unknown` /
 low-content categories are rated high-risk by default.
 
-## Decisions taken
+The no-JS view of `/` is now **354 words**.
 
-Four choices were confirmed before implementation:
+## Decisions taken
 
 | Decision | Choice |
 |---|---|
@@ -40,6 +62,7 @@ Four choices were confirmed before implementation:
 | Crawler visibility | Static HTML files in `public/` for the info pages, plus a static copy of the landing page baked into `index.html`. No new build dependencies. |
 | Naming / affiliation | Brand-neutral: "Generator's University Team Tracking System" only. No Northeastern or personal naming. Riot Games disclaimer included. |
 | Contact address | `contact@jemsbley.dev` (inbox setup writeup at the end of this document). |
+| Info page depth | Minimal boilerplate, to be filled in later. |
 
 ---
 
@@ -47,48 +70,31 @@ Four choices were confirmed before implementation:
 
 ### New: static public pages
 
-**`public/about.html`** — What the site is, what each feature does
-(round-by-round records, map/agent analytics, player breakdowns, veto
-planning, VOD review, opponent scouting), how it's built, and how to get
-access. This is the single densest piece of real content on the domain and the
-main answer to "insufficient content."
+Written as deliberately thin boilerplate — a heading and a short paragraph per
+section — so they're easy to rewrite later without unpicking prose.
 
-**`public/privacy.html`** — Privacy policy, written against what the code
-actually does rather than boilerplate:
+**`public/about.html`** (55 lines) — What the tool is, that accounts are
+invite-only, and a contact address.
 
-- Discloses exactly what Google Sign-In yields and what is kept: the email
-  address and the token's `sub` claim. Notes that profile name and picture are
-  *not* stored (verified in `server/src/routes/auth.ts`).
-- Describes the sign-in token in `localStorage` under `team-tracker-token` by
-  name, and clarifies it is not a cookie.
-- States plainly that there is no analytics, advertising, tracking pixel,
-  session recording, or fingerprinting, and nothing is sold or shared.
-- Notes the tracker.gg import is a **manual paste** and that the site never
-  contacts tracker.gg on the user's behalf (verified in
-  `TrackerImportModal.tsx`).
-- Names the actual subprocessors: Vercel, Railway, Google.
-- Documents roster-membership visibility (owner/editor/viewer) and that an
-  admin account can access records.
-- Deletion path, including the cascade behavior — deleting an account deletes
-  the rosters it created — and offers ownership transfer as the alternative.
+**`public/privacy.html`** (70 lines) — Five stub sections: what's collected,
+how it's used, who it's shared with, how to get data deleted, and contact. The
+statements are accurate to what the code does (email plus Google account
+identifier, a chosen display name, the data you enter; no analytics or
+third-party tracking) but deliberately brief.
 
-**`public/terms.html`** — Terms of use: invite-only access, acceptable use,
-user retains ownership of their match data, as-is availability with no uptime
-guarantee, termination, the Riot Games IP notice, warranty disclaimer, and a
-liability limit framed around the service being free.
+**`public/terms.html`** (76 lines) — Six stub sections: access, acceptable use,
+your content, no warranty, intellectual property (the Riot Games notice), and
+contact.
 
 **`public/page.css`** — One small hand-written stylesheet shared by the three
-pages above. Deliberately not Tailwind: these pages must render correctly with
-zero JavaScript, and the Tailwind build only arrives with the JS bundle.
-Colors mirror the `valorant` palette from `tailwind.config.js`.
+pages. Deliberately not Tailwind: these pages must render correctly with zero
+JavaScript, and the Tailwind build only arrives with the JS bundle. Colors
+mirror the `valorant` palette from `tailwind.config.js`. Left fuller than the
+pages currently need, so added sections pick up styling for free.
 
 ### New: crawler plumbing
 
-**`public/robots.txt`** — Explicitly allows `/`, `/about`, `/privacy`,
-`/terms`, `/login`, and disallows the authenticated app routes (`/maps`,
-`/series`, `/scouting`, `/admin`, `/invite/`, …). This matters: those routes
-can only ever serve an auth redirect, so steering crawlers away from them and
-toward the pages with actual content is the point. Points at the sitemap.
+**`public/robots.txt`** — Four lines: allow everything, point at the sitemap.
 
 **`public/sitemap.xml`** — The four public URLs with `lastmod` dates.
 
@@ -103,36 +109,43 @@ without running JS.
 - Full OpenGraph and Twitter card tags.
 - Static `<link rel="icon">` and `apple-touch-icon` pointing at
   `/favicon.png`.
-- **A complete static copy of the landing page inside `<div id="root">`.** This
-  is the no-JavaScript view of the site: headline, positioning paragraph, an
-  explicit note that accounts are invite-only and there is no public database,
-  a six-item feature list, an access explanation, links to the info pages, and
-  the contact plus Riot disclaimer.
+- **A complete static copy of the landing page inside `<div id="root">`**,
+  including the sticky header and its sign-in button. This is the
+  no-JavaScript view of the site.
 - A small inline `<style>` block (classes prefixed `s-`) so that markup is
-  *styled* without JS, rather than rendering as unstyled text. It also means
-  the first paint before the bundle loads looks like the finished page rather
-  than a flash of raw HTML.
+  *styled* without JS rather than rendering as raw text. It also means the
+  first paint before the bundle loads looks like the finished page.
+
+The guest-mode button is intentionally **not** in this static copy — it's a
+store action that does nothing without JavaScript, so the no-JS view offers
+sign-in only. There's a comment in the markup saying so.
 
 Keep this copy in sync with `LandingPage.tsx` — there is a comment in both
 files saying so.
 
-### `src/main.tsx`
-
-- Clears `#root` immediately before mounting, so the static shell is never
-  visible alongside the React tree. React 18's `createRoot` empties the
-  container anyway; doing it explicitly makes the contract obvious instead of
-  load-bearing on framework behavior.
-- Removed the runtime favicon injection block. The static `<link>` in
-  `index.html` now handles it, which works in dev and prod and — unlike the old
-  approach — without JavaScript. The `generatorLogo` import here is gone.
-
 ### `src/pages/LandingPage.tsx` (new)
 
-The React landing page shown at `/` to unauthenticated visitors. Same copy as
-the static shell, styled with the app's existing `card` / `btn-primary`
-classes and `valorant` palette. Links to the info pages are plain `<a>` tags
-rather than router `<Link>`s, because those pages are standalone static HTML
-served outside the SPA.
+The React landing page shown at `/` to unauthenticated visitors.
+
+- **Sticky header** — `sticky top-0 z-10` with the same border, translucent
+  panel background, and backdrop blur as `AppHeader`, so it reads as the same
+  component family. Holds the logo, the app name, and a **Sign in** button
+  pushed right with `ml-auto`. The name gets `truncate` and the button
+  `shrink-0`, so the header stays a single row at any width and the button is
+  never the thing that wraps.
+- **Two buttons at the bottom** of the page body, side by side: **Sign in**
+  (`btn-primary`, routes to `/login`) and **I'm a guest — browse sample data**
+  (`btn-ghost`, calls `enterGuestMode` from `authStore`). They sit in a
+  `flex flex-wrap gap-3` row so they drop to two lines on narrow screens
+  instead of overflowing.
+- Six feature cards using the app's existing `card` class, now including the
+  heatmap page that came in with the merge.
+- Footer links to the info pages as plain `<a>` tags rather than router
+  `<Link>`s, because those pages are standalone static HTML outside the SPA.
+
+The guest button needs no navigation: it's already at `/`, so flipping the auth
+status to `'guest'` makes `AuthGuard` re-render that same route into the app
+with sample data loaded.
 
 ### `src/components/AuthGuard.tsx`
 
@@ -147,14 +160,29 @@ if (status === 'unauthenticated') {
 
 `/` now renders the landing page for visitors with no session, while every
 other protected route redirects to login exactly as before. `App.tsx` and the
-route table are untouched, which is why no in-app URL changed.
+route table are untouched, which is why no in-app URL changed. Upstream's
+`loadGuestSample` effect and its `/settings` + `/admin` guest redirects are
+unaffected.
+
+### `src/main.tsx`
+
+- Clears `#root` immediately before mounting, so the static shell is never
+  visible alongside the React tree. React 18's `createRoot` empties the
+  container anyway; doing it explicitly makes the contract obvious instead of
+  load-bearing on framework behavior.
+- Removed the runtime favicon injection block (and the now-unused
+  `generatorLogo` import). The static `<link>` in `index.html` handles it,
+  which works in dev and prod and — unlike the old approach — without
+  JavaScript.
 
 ### `src/pages/LoginPage.tsx`
 
 A crawler that follows the sign-in link lands here, so it got a one-line
 description of what the site is ("Match tracking and analytics for competitive
 Valorant teams") ahead of the existing "sign in to continue," plus a footer row
-linking About / Privacy / Terms.
+linking About / Privacy / Terms. Upstream's guest button is kept above those
+links — the landing page is now the primary home for it, but leaving it here
+costs nothing and preserves the existing entry point.
 
 ### `src/components/Layout.tsx`
 
@@ -188,11 +216,12 @@ Added a `publicPageCleanUrls()` plugin that applies the same `/about` →
 `vercel.json`, and the SPA fallback grabs the request before the static file is
 found. Caught this during verification.
 
-### `package.json`
+### `src/utils/changelog.ts`, `package.json`
 
-`0.1.0` → `0.2.0`. Note: there is no `src/utils/changelog.ts` or version chip
-in this branch, so there was no in-app changelog entry to extend — this file
-serves that purpose for now.
+New `1.1.1` entry at the top of `CHANGELOG` — two lines, covering the landing
+page with its info pages and the relocated guest button. `package.json` bumped
+to match. The header chip reads `CHANGELOG[0].version`, so the new version
+shows up in the app automatically.
 
 ---
 
@@ -200,22 +229,21 @@ serves that purpose for now.
 
 | Request | Before | After |
 |---|---|---|
-| `GET /` (no JS) | Empty `<div id="root">` | ~350 words: headline, description, feature list, access info, contact, disclaimer — styled |
+| `GET /` (no JS) | Empty `<div id="root">` | 354 words: header, headline, description, feature list, access info, contact, disclaimer — styled |
 | `GET /` (with JS) | 302 → `/login` | Full landing page |
 | `GET /` (signed in) | StatsPage | StatsPage — unchanged |
-| `GET /about` | SPA fallback, empty | Full static page, no JS needed |
-| `GET /privacy` | SPA fallback, empty | Full policy, no JS needed |
-| `GET /terms` | SPA fallback, empty | Full terms, no JS needed |
-| `GET /robots.txt` | 404 | Allow/disallow rules + sitemap pointer |
+| `GET /about` | SPA fallback, empty | Static page, no JS needed |
+| `GET /privacy` | SPA fallback, empty | Static page, no JS needed |
+| `GET /terms` | SPA fallback, empty | Static page, no JS needed |
+| `GET /robots.txt` | 404 | Allow-all plus sitemap pointer |
 | `GET /sitemap.xml` | 404 | Four public URLs |
 | `GET /favicon.png` | 404 (JS-injected only) | Static PNG |
-| `GET /maps` etc. | SPA → login | Unchanged, now `Disallow`ed |
 
 ## Verifying
 
-`npm run build` passes (`tsc -b` clean). Verified by serving `dist/` and
-checking every public path returns 200 with the right content type, and by
-stripping all tags from `/` to confirm the text a JS-less crawler reads.
+`npm run build` passes (`tsc -b` clean) on the merged tree. Verified by serving
+the build and checking every public path returns 200, and by stripping all tags
+from `/` to confirm the text a JS-less crawler reads.
 
 To check it yourself:
 
@@ -226,12 +254,15 @@ npm run build && npm run preview
 Then, **signed out** (use a private window, or clear `localStorage`):
 
 - `/` — the landing page instead of an instant bounce to login
-- `/about`, `/privacy`, `/terms` — the three static pages
-- `/robots.txt`, `/sitemap.xml`
-- Click **Sign in** → login screen now has the description line and the three
-  footer links
-- **Signed in**: `/` still loads StatsPage, and every nav link and shared
-  filter URL behaves as before. New About/Privacy/Terms links in the footer.
+- Scroll down — the title bar stays pinned, with its **Sign in** button
+- At the bottom of the page body — **Sign in** and **I'm a guest — browse
+  sample data** side by side; the guest button drops straight into the app on
+  sample data
+- `/about`, `/privacy`, `/terms`, `/robots.txt`, `/sitemap.xml`
+- The login screen keeps its own guest button and gained the three info links
+- **Signed in**: `/` still loads StatsPage, every nav link and shared filter
+  URL behaves as before, and the version chip reads **v1.1.1** and opens the
+  changelog modal with the new entry
 
 To see what a classifier sees:
 
@@ -243,7 +274,7 @@ curl -s https://tracker.jemsbley.dev/ | sed -e 's/<[^>]*>//g'
 
 ## Setting up the `contact@jemsbley.dev` inbox
 
-The address is now published in `index.html`, all three static pages, and
+The address is published in `index.html`, all three static pages, and
 `LandingPage.tsx`. It needs to actually receive mail — a privacy policy with a
 dead contact address is worse than no address at all, and a bouncing contact
 undercuts exactly the legitimacy signal this change is trying to establish.
@@ -346,12 +377,18 @@ scoring at several vendors:
   Fortiguard, Zscaler) — worth checking if the block is actually affecting
   people on campus networks.
 
-## Two things to flag
+## Three things to flag
 
-- **The legal pages are plain-language drafts, not lawyer-reviewed.** They are
+- **The thin info pages are a slight trade against the classifier.** The
+  landing page carries the weight now at 354 words of real description, which
+  is the page Palo Alto crawls, so this should still clear
+  `Insufficient-Content`. But a two-paragraph About page contributes much less
+  than a detailed one would. If the category request comes back rejected,
+  fleshing these three pages out is the first thing to try.
+- **The legal pages are plain-language stubs, not lawyer-reviewed.** They are
   accurate about what the code does, which is what matters for both the
-  classifier and for Google OAuth verification. If this ever stops being a
-  small free tool for one team, have them looked at properly.
+  classifier and Google OAuth verification. If this ever stops being a small
+  free tool for one team, have them looked at properly.
 - **Pre-existing, not fixed:** `LoginPage.tsx` uses
   `className="… bg-valorant-bg"`, but `valorant.bg` isn't defined in
   `tailwind.config.js` (the palette has `dark`, `panel`, `panel2`, `accent`,

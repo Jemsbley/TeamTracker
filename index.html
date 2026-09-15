@@ -7,7 +7,7 @@
     <title>Generator's University Team Tracking System — Valorant Match Tracking &amp; Analytics</title>
     <meta
       name="description"
-      content="A private match-tracking and analytics tool for competitive Valorant teams. Record series round-by-round, then break the data down by map, agent, and player, build map vetoes, attach VOD reviews, and scout upcoming opponents."
+      content="A private match-tracking and analytics tool for competitive Valorant teams. Record series round-by-round, then break the data down by map, agent, and player, build map vetoes and heatmaps, attach VOD reviews, and scout upcoming opponents."
     />
     <meta name="robots" content="index, follow" />
     <meta name="theme-color" content="#0F1923" />
@@ -47,24 +47,64 @@
         color: #ECE8E1;
         font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       }
-      .s-shell { max-width: 46rem; margin: 0 auto; padding: 4rem 1.5rem; }
-      .s-logo { width: 4rem; height: 4rem; object-fit: contain; }
-      .s-shell h1 { font-size: 1.75rem; line-height: 1.25; margin: 1.25rem 0 0.5rem; }
-      .s-tagline { color: #FF4655; font-weight: 600; margin: 0 0 1.5rem; }
+
+      /* Sticky header, mirroring LandingPage.tsx. */
+      .s-head {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: rgba(26, 38, 50, 0.8);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .s-head-inner {
+        max-width: 46rem;
+        margin: 0 auto;
+        padding: 0.75rem 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      .s-head img { width: 2rem; height: 2rem; object-fit: contain; flex: none; }
+      .s-head-name {
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .s-head .s-cta {
+        margin-left: auto;
+        flex: none;
+        margin-top: 0;
+        padding: 0.4rem 0.9rem;
+        font-size: 0.875rem;
+      }
+
+      .s-shell { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+      .s-shell h1 { font-size: 1.75rem; line-height: 1.25; margin: 0 0 1rem; }
       .s-shell h2 { font-size: 1.1rem; margin: 2rem 0 0.5rem; }
       .s-shell p { line-height: 1.65; margin: 0 0 1rem; }
       .s-shell ul { line-height: 1.7; padding-left: 1.25rem; }
       .s-cta {
-        display: inline-block; margin-top: 0.5rem; padding: 0.6rem 1.1rem;
-        background: #FF4655; color: #fff; border-radius: 0.375rem;
-        font-weight: 600; text-decoration: none;
+        display: inline-block;
+        margin-top: 0.5rem;
+        padding: 0.6rem 1.1rem;
+        background: #FF4655;
+        color: #fff;
+        border-radius: 0.375rem;
+        font-weight: 600;
+        text-decoration: none;
       }
       .s-links { margin-top: 2.5rem; }
       .s-links a { color: #ECE8E1; margin-right: 1rem; }
       .s-foot {
-        margin-top: 2.5rem; padding-top: 1.5rem;
+        margin-top: 2.5rem;
+        padding-top: 1.5rem;
         border-top: 1px solid rgba(255, 255, 255, 0.08);
-        color: #768079; font-size: 0.8rem; line-height: 1.6;
+        color: #768079;
+        font-size: 0.8rem;
+        line-height: 1.6;
       }
       .s-foot a { color: #768079; }
     </style>
@@ -76,12 +116,22 @@
       main.tsx clears it immediately before mounting, so it is never visible
       alongside the app. Keep it in sync with LandingPage.tsx if the pitch
       copy changes.
+
+      The guest-mode button from LandingPage.tsx is intentionally absent here:
+      it's a store action that does nothing without JavaScript, so this view
+      offers sign-in only.
     -->
     <div id="root">
+      <header class="s-head">
+        <div class="s-head-inner">
+          <img src="/favicon.png" alt="" />
+          <span class="s-head-name">Generator's University Team Tracking System</span>
+          <a class="s-cta" href="/login">Sign in</a>
+        </div>
+      </header>
+
       <div class="s-shell">
-        <img class="s-logo" src="/favicon.png" alt="Generator's University Team Tracking System logo" />
-        <h1>Generator's University Team Tracking System</h1>
-        <p class="s-tagline">Match tracking and analytics for competitive Valorant teams.</p>
+        <h1>Match tracking and analytics for competitive Valorant teams.</h1>
 
         <p>
           This is a private team tool. It records competitive Valorant matches
@@ -101,10 +151,10 @@
         <ul>
           <li><strong>Round-by-round match records</strong> — log every round of a series, including the buy phase and economy on both sides.</li>
           <li><strong>Team, map, and agent analytics</strong> — win rates, attack/defense splits, and composition performance broken out by map.</li>
+          <li><strong>Positioning heatmaps</strong> — visualize where kills and deaths happen across each map.</li>
           <li><strong>Player breakdowns</strong> — per-player stats filtered by map, agent, role, and date range.</li>
           <li><strong>Map veto planning</strong> — build and review pick/ban sequences against a specific opponent.</li>
-          <li><strong>VOD review</strong> — attach match videos and timestamped review notes to the series they belong to.</li>
-          <li><strong>Opponent scouting</strong> — collect scouting reports on upcoming opponents alongside their map and agent tendencies.</li>
+          <li><strong>VOD review and scouting</strong> — attach match videos and review notes, and keep scouting reports next to an opponent's tendencies.</li>
         </ul>
 
         <h2>Getting access</h2>
