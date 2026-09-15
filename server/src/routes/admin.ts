@@ -62,7 +62,15 @@ adminRouter.delete(
     }
     const exists = await prisma.user.findUnique({ where: { id: req.params.id } });
     if (!exists) throw new HttpError(404, 'User not found');
-    await prisma.user.delete({ where: { id: req.params.id } });
+    await prisma.$transaction([
+      // Unlink any player slots this user occupied on rosters they don't own
+      // (no FK on linkedUserId, so this doesn't cascade on its own).
+      prisma.player.updateMany({
+        where: { linkedUserId: req.params.id },
+        data: { linkedUserId: null },
+      }),
+      prisma.user.delete({ where: { id: req.params.id } }),
+    ]);
     res.status(204).end();
   })
 );

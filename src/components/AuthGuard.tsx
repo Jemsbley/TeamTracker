@@ -18,15 +18,19 @@ export default function AuthGuard() {
   const user = useAuth((s) => s.user);
   const hydrated = useStore((s) => s.hydrated);
   const loadFromServer = useStore((s) => s.loadFromServer);
+  const loadGuestSample = useStore((s) => s.loadGuestSample);
   const location = useLocation();
 
   useEffect(() => {
-    if (status === 'authenticated' && !hydrated) {
+    if (hydrated) return;
+    if (status === 'authenticated') {
       loadFromServer().catch((e) => {
         console.error('Failed to load state:', e);
       });
+    } else if (status === 'guest') {
+      loadGuestSample();
     }
-  }, [status, hydrated, loadFromServer]);
+  }, [status, hydrated, loadFromServer, loadGuestSample]);
 
   if (status === 'loading') {
     return (
@@ -48,6 +52,15 @@ export default function AuthGuard() {
   // Authenticated but hasn't chosen a username yet — force onboarding.
   if (user && !user.username) {
     return <Navigate to="/onboarding" replace />;
+  }
+
+  // Guests have no account — settings and admin have nothing to show them.
+  if (
+    status === 'guest' &&
+    (location.pathname.startsWith('/settings') ||
+      location.pathname.startsWith('/admin'))
+  ) {
+    return <Navigate to="/" replace />;
   }
 
   if (!hydrated) {

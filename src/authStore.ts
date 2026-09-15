@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { auth, me, type AuthUser } from './api/endpoints';
 import { getToken, setToken } from './api/client';
 
-type Status = 'loading' | 'authenticated' | 'unauthenticated';
+type Status = 'loading' | 'authenticated' | 'unauthenticated' | 'guest';
 
 type AuthState = {
   status: Status;
@@ -15,6 +15,8 @@ type AuthState = {
   loginWithGoogle: (credential: string) => Promise<void>;
   /** Replace the cached user (e.g. after updating the username). */
   setUser: (user: AuthUser) => void;
+  /** Enter read-only "window shopping" mode with locally-generated sample data. */
+  enterGuestMode: () => void;
   logout: () => void;
 };
 
@@ -58,6 +60,8 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   setUser: (user) => set({ user }),
+
+  enterGuestMode: () => set({ status: 'guest', user: null, error: null }),
 
   logout: () => {
     setToken(null);

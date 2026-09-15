@@ -83,7 +83,8 @@ export default function SeriesListPage() {
   const addSeries = useStore((s) => s.addSeries);
   const removeSeries = useStore((s) => s.removeSeries);
   const adminViewing = useStore((s) => s.adminViewing);
-  const gate = { rosters, series, adminViewing };
+  const guestMode = useStore((s) => s.guestMode);
+  const gate = { rosters, series, adminViewing, guestMode };
 
   const today = new Date().toISOString().slice(0, 10);
   const [opponent, setOpponent] = useState('');

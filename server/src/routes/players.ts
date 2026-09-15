@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma.js';
-import { asyncHandler, HttpError, uid } from '../util.js';
+import { asyncHandler, HttpError, uid, stripUserId } from '../util.js';
 import { requireRosterAccess, memberRosterIds } from '../access.js';
 
 export const playersRouter = Router();
@@ -10,13 +10,15 @@ const playerBody = z.object({
   rosterId: z.string().min(1),
   name: z.string().min(1).max(200),
   isMainRoster: z.boolean(),
+  // Tracker.gg identifier this player was most recently matched to during a
+  // match import; used only to preselect matches on future imports.
+  lastSeenIgn: z.string().max(200).nullable().optional(),
 });
 
 const playerCreate = playerBody.extend({ id: z.string().min(1).max(64).optional() });
 
 const playerPatch = playerBody.partial();
 
-const strip = ({ userId: _u, ...rest }: { userId: string | null }) => rest;
 
 playersRouter.get(
   '/',
@@ -25,7 +27,7 @@ playersRouter.get(
     const players = await prisma.player.findMany({
       where: { rosterId: { in: rosterIds } },
     });
-    res.json(players.map(strip));
+    res.json(players.map(stripUserId));
   })
 );
 
@@ -37,7 +39,7 @@ playersRouter.post(
     const created = await prisma.player.create({
       data: { id: id ?? uid(), userId: req.userId!, ...data },
     });
-    res.status(201).json(strip(created));
+    res.status(201).json(stripUserId(created));
   })
 );
 
@@ -56,7 +58,7 @@ playersRouter.patch(
       where: { id: existing.id },
       data: patch,
     });
-    res.json(strip(updated));
+    res.json(stripUserId(updated));
   })
 );
 

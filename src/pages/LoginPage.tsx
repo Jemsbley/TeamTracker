@@ -7,10 +7,13 @@ import { useAuth } from '../authStore';
 export default function LoginPage() {
   const status = useAuth((s) => s.status);
   const loginWithGoogle = useAuth((s) => s.loginWithGoogle);
+  const enterGuestMode = useAuth((s) => s.enterGuestMode);
   const [error, setError] = useState<string | null>(null);
   const nav = useNavigate();
 
-  if (status === 'authenticated') return <Navigate to="/" replace />;
+  if (status === 'authenticated' || status === 'guest') {
+    return <Navigate to="/" replace />;
+  }
 
   const clientConfigured = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
@@ -56,18 +59,32 @@ export default function LoginPage() {
 
         {error && <p className="text-sm text-red-400">{error}</p>}
 
-        {/* Public info pages. Plain anchors, not <Link>: these are standalone
-            static HTML pages served outside the SPA. */}
-        <div className="pt-2 border-t border-white/5 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-valorant-muted">
-          <a href="/about" className="hover:text-valorant-accent">
-            About
-          </a>
-          <a href="/privacy" className="hover:text-valorant-accent">
-            Privacy
-          </a>
-          <a href="/terms" className="hover:text-valorant-accent">
-            Terms
-          </a>
+        {/* Guest mode plus the public info pages. The info links are plain
+            anchors, not <Link>: they're standalone static HTML served outside
+            the SPA. */}
+        <div className="pt-2 border-t border-white/5 space-y-3">
+          <button
+            type="button"
+            onClick={() => {
+              enterGuestMode();
+              nav('/', { replace: true });
+            }}
+            className="text-sm text-valorant-muted hover:text-valorant-accent underline"
+          >
+            I'm a guest — browse sample data
+          </button>
+
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-valorant-muted">
+            <a href="/about" className="hover:text-valorant-accent">
+              About
+            </a>
+            <a href="/privacy" className="hover:text-valorant-accent">
+              Privacy
+            </a>
+            <a href="/terms" className="hover:text-valorant-accent">
+              Terms
+            </a>
+          </div>
         </div>
       </div>
     </div>
