@@ -2,12 +2,16 @@ import { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../authStore';
 import { useStore } from '../store';
+import LandingPage from '../pages/LandingPage';
 import AppHeader from './AppHeader';
 import { RouteSkeleton } from './skeletons';
 
 /**
  * Wraps protected routes. While auth state is unknown, shows a spinner; once
  * authenticated, hydrates the data store from /me/state before rendering.
+ *
+ * Unauthenticated visitors are redirected to login, except at `/`, which
+ * renders the public landing page instead.
  */
 export default function AuthGuard() {
   const status = useAuth((s) => s.status);
@@ -37,6 +41,11 @@ export default function AuthGuard() {
   }
 
   if (status === 'unauthenticated') {
+    // The root URL doubles as the public landing page: a visitor with no
+    // session gets a real description of the site instead of an immediate
+    // bounce to a bare login screen. Every other protected route still
+    // redirects to login as before.
+    if (location.pathname === '/') return <LandingPage />;
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
