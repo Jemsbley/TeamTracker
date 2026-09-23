@@ -22,6 +22,18 @@ export function formatReleaseDate(iso: string): string {
 // Newest first.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.0',
+    date: '2026-09-23',
+    title: 'Round% and stat fixes',
+    changes: [
+      'Added a Round% tab to Stats: filter rounds by side, first blood/first death, map, spike plant (and site), multikills, kills, deaths, and assists, and see what share of those rounds we win',
+      'Kill/death/assist/multikill and plant-site filters read the round-by-round detail stored with tracker.gg imports',
+      'Tracker.gg imports no longer count 2k rounds as multikills — MK is now rounds with 3+ kills',
+      'Corrected MK on games already imported from tracker.gg',
+      'Maps: Ban% and Opp Ban% are now the share of series in which the map was banned, not the share of that team\'s total bans',
+    ],
+  },
+  {
     version: '1.1.1',
     date: '2026-09-15',
     title: 'Public landing page',

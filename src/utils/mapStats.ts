@@ -77,7 +77,9 @@ export type MapAggregate = {
   wins: number;
   losses: number;
   ourPickCount: number;
+  /** Number of series in which we banned this map. */
   ourBanCount: number;
+  /** Number of series in which the opponent banned this map. */
   enemyBanCount: number;
   attackPistol: { wins: number; total: number };
   defensePistol: { wins: number; total: number };
@@ -96,10 +98,10 @@ export type MapAggregates = {
   byMap: Record<string, MapAggregate>;
   /** Total picks made by us across the scope. */
   ourPickTotal: number;
-  /** Total bans made by us across the scope. */
-  ourBanTotal: number;
-  /** Total bans made by the opponent across the scope. */
-  enemyBanTotal: number;
+  /** Series in the scope with at least one recorded ban by us. */
+  ourBanSeriesTotal: number;
+  /** Series in the scope with at least one recorded opponent ban. */
+  enemyBanSeriesTotal: number;
 };
 
 export function computeMapAggregates(
@@ -128,11 +130,13 @@ export function computeMapAggregates(
 
   // Pick / ban counts
   let ourPickTotal = 0;
-  let ourBanTotal = 0;
-  let enemyBanTotal = 0;
+  let ourBanSeriesTotal = 0;
+  let enemyBanSeriesTotal = 0;
   for (const s of series) {
     if (!s.format || !s.pickBan) continue;
     const steps = PICKBAN_STEPS[s.format];
+    let sawOurBan = false;
+    let sawEnemyBan = false;
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
       const move = s.pickBan.moves[i];
@@ -148,13 +152,15 @@ export function computeMapAggregates(
       } else {
         if (ours) {
           agg.ourBanCount += 1;
-          ourBanTotal += 1;
+          sawOurBan = true;
         } else {
           agg.enemyBanCount += 1;
-          enemyBanTotal += 1;
+          sawEnemyBan = true;
         }
       }
     }
+    if (sawOurBan) ourBanSeriesTotal += 1;
+    if (sawEnemyBan) enemyBanSeriesTotal += 1;
   }
 
   // Per-map agent comp aggregation
@@ -248,5 +254,5 @@ export function computeMapAggregates(
     byMap[m].topComp = best;
   }
 
-  return { byMap, ourPickTotal, ourBanTotal, enemyBanTotal };
+  return { byMap, ourPickTotal, ourBanSeriesTotal, enemyBanSeriesTotal };
 }
