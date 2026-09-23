@@ -10,6 +10,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
+    "backfill:multikills": "tsx src/scripts/backfillMultikills.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

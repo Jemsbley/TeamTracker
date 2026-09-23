@@ -64,7 +64,7 @@ function rate(num: number, denom: number): number | undefined {
 function getSortValue(
   m: MapAggregate,
   key: SortKey,
-  totals: { ourPick: number; ourBan: number; enemyBan: number }
+  totals: { ourPick: number; ourBanSeries: number; enemyBanSeries: number }
 ): number | string | undefined {
   switch (key) {
     case 'map':
@@ -76,9 +76,9 @@ function getSortValue(
     case 'pickRate':
       return rate(m.ourPickCount, totals.ourPick);
     case 'banRate':
-      return rate(m.ourBanCount, totals.ourBan);
+      return rate(m.ourBanCount, totals.ourBanSeries);
     case 'oppBanRate':
-      return rate(m.enemyBanCount, totals.enemyBan);
+      return rate(m.enemyBanCount, totals.enemyBanSeries);
     case 'atkPistol':
       return rate(m.attackPistol.wins, m.attackPistol.total);
     case 'defPistol':
@@ -202,8 +202,8 @@ export default function MapsPage() {
     const arr = Object.values(aggregates.byMap);
     const totals = {
       ourPick: aggregates.ourPickTotal,
-      ourBan: aggregates.ourBanTotal,
-      enemyBan: aggregates.enemyBanTotal,
+      ourBanSeries: aggregates.ourBanSeriesTotal,
+      enemyBanSeries: aggregates.enemyBanSeriesTotal,
     };
     arr.sort((a, b) => {
       const va = getSortValue(a, sortKey, totals);
@@ -409,8 +409,8 @@ export default function MapsPage() {
                   key={m.map}
                   m={m}
                   ourPickTotal={aggregates.ourPickTotal}
-                  ourBanTotal={aggregates.ourBanTotal}
-                  enemyBanTotal={aggregates.enemyBanTotal}
+                  ourBanSeriesTotal={aggregates.ourBanSeriesTotal}
+                  enemyBanSeriesTotal={aggregates.enemyBanSeriesTotal}
                   onClick={() => goToMapInStats(m.map)}
                 />
               ))}
@@ -421,9 +421,9 @@ export default function MapsPage() {
 
       <div className="text-xs text-valorant-muted">
         <p>
-          Pick% = our picks of this map ÷ all our picks. Ban% = our bans of this
-          map ÷ all our bans. Opp Ban% = opponent bans of this map ÷ all
-          opponent bans. Top Comp = the 5-agent composition with the highest win
+          Pick% = our picks of this map ÷ all our picks. Ban% = series where we banned this map ÷
+          all series with recorded bans by us. Opp Ban% = series where the
+          opponent banned this map ÷ all series with recorded opponent bans. Top Comp = the 5-agent composition with the highest win
           rate (ties broken by play count).
         </p>
       </div>
@@ -468,14 +468,14 @@ function SortHeader({
 function MapRow({
   m,
   ourPickTotal,
-  ourBanTotal,
-  enemyBanTotal,
+  ourBanSeriesTotal,
+  enemyBanSeriesTotal,
   onClick,
 }: {
   m: MapAggregate;
   ourPickTotal: number;
-  ourBanTotal: number;
-  enemyBanTotal: number;
+  ourBanSeriesTotal: number;
+  enemyBanSeriesTotal: number;
   onClick: () => void;
 }) {
   const avgAcs = m.acsCount > 0 ? m.acsSum / m.acsCount : 0;
@@ -502,10 +502,10 @@ function MapRow({
         {ratePct(m.ourPickCount, ourPickTotal)}
       </td>
       <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
-        {ratePct(m.ourBanCount, ourBanTotal)}
+        {ratePct(m.ourBanCount, ourBanSeriesTotal)}
       </td>
       <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
-        {ratePct(m.enemyBanCount, enemyBanTotal)}
+        {ratePct(m.enemyBanCount, enemyBanSeriesTotal)}
       </td>
       <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
         {pct(m.attackRounds.wins, m.attackRounds.total)}{' '}

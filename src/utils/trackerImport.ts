@@ -49,9 +49,13 @@ export type TrackerImportResult = {
   }>;
 };
 
-function num(seg: TrackerSegment | undefined, key: string): number {
+function optNum(seg: TrackerSegment | undefined, key: string): number | undefined {
   const v = seg?.stats?.[key];
-  return typeof v?.value === 'number' && isFinite(v.value) ? v.value : 0;
+  return typeof v?.value === 'number' && isFinite(v.value) ? v.value : undefined;
+}
+
+function num(seg: TrackerSegment | undefined, key: string): number {
+  return optNum(seg, key) ?? 0;
 }
 
 function round1(n: number): number {
@@ -208,11 +212,13 @@ export function parseTrackerMatchJson(raw: string): TrackerImportResult {
     const name = identifier?.split('#')[0] ?? identifier ?? 'Unknown';
     const team = (seg.metadata.teamId as TeamColor) === 'Blue' ? 'Blue' : 'Red';
     const agent = typeof seg.metadata.agentName === 'string' ? seg.metadata.agentName : '';
+    // tracker buckets a player's rounds by exact kill count, so `doubleKills`
+    // means "rounds with exactly 2 kills" — a 2k isn't a multikill. Only 3k+
+    // rounds count, which is what tracker's own `multiKills` reports; sum the
+    // 3k/4k/5k buckets if that stat is missing.
     const multikills =
-      num(seg, 'doubleKills') +
-      num(seg, 'tripleKills') +
-      num(seg, 'quadraKills') +
-      num(seg, 'pentaKills');
+      optNum(seg, 'multiKills') ??
+      num(seg, 'tripleKills') + num(seg, 'quadraKills') + num(seg, 'pentaKills');
     const stat: Omit<GameStat, 'playerId'> = {
       agent,
       acs: Math.round(num(seg, 'scorePerRound')),

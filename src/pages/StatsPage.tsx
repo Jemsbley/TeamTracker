@@ -19,15 +19,17 @@ import type { ValorantMap } from '../types';
 import OverallStatsTab from './stats/OverallStatsTab';
 import WinLossStatsTab from './stats/WinLossStatsTab';
 import ExamineCloserTab from './stats/ExamineCloserTab';
+import RoundPctTab from './stats/RoundPctTab';
 import ProgressionTab from './stats/ProgressionTab';
 
-type TabKey = 'overall' | 'wins' | 'losses' | 'examine' | 'progression';
+type TabKey = 'overall' | 'wins' | 'losses' | 'examine' | 'roundpct' | 'progression';
 
 const TAB_KEYS: TabKey[] = [
   'overall',
   'wins',
   'losses',
   'examine',
+  'roundpct',
   'progression',
 ];
 
@@ -36,6 +38,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'wins', label: 'When we win' },
   { key: 'losses', label: 'When we lose' },
   { key: 'examine', label: 'Examine closer' },
+  { key: 'roundpct', label: 'Round%' },
   { key: 'progression', label: 'Progression' },
 ];
 
@@ -317,6 +320,13 @@ export default function StatsPage() {
             scopedPlayers={rosterScopedPlayers}
             filteredGames={filteredGames}
             filters={filters}
+          />
+        )}
+        {tab === 'roundpct' && (
+          <RoundPctTab
+            scopedPlayers={rosterScopedPlayers}
+            scopedSeries={rosterScopedSeries}
+            filteredGames={filteredGames}
           />
         )}
         {tab === 'progression' && (
