@@ -1,4 +1,4 @@
-import type { SeriesFormat, Side, ValorantMap } from '../types';
+import type { Series, SeriesFormat, Side, ValorantMap } from '../types';
 
 export type Team = 1 | 2;
 
@@ -130,4 +130,18 @@ export function playedMaps(
     });
   }
   return out;
+}
+
+/**
+ * Map pool from the most recent series (by date, later-added wins ties) that
+ * has a full pool, or [] if none. New series start from this since the
+ * competitive pool usually only rotates a map or two at a time.
+ */
+export function latestMapPool(series: Series[]): ValorantMap[] {
+  let best: Series | undefined;
+  for (const s of series) {
+    if (s.pickBan?.pool.length !== POOL_SIZE) continue;
+    if (!best || s.date >= best.date) best = s;
+  }
+  return best ? [...best.pickBan!.pool] : [];
 }

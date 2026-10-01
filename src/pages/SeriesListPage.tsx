@@ -18,7 +18,7 @@ import { seriesStatus } from '../utils/series';
 import { ALL_ROSTERS, defaultRosterId, resolveRosterFilter } from '../utils/rosters';
 import { deriveScore } from '../utils/rounds';
 import { gameMvpPlayerId, seriesMvpPlayerId } from '../utils/mvp';
-import { PICKBAN_STEPS, isUs, type Team } from '../utils/pickBan';
+import { PICKBAN_STEPS, isUs, latestMapPool, type Team } from '../utils/pickBan';
 
 type VetoEntry =
   | {
@@ -108,7 +108,14 @@ export default function SeriesListPage() {
     e.preventDefault();
     const o = opponent.trim();
     if (!o || !newRosterId || !canCreate) return;
-    addSeries({ opponent: o, date, format, rosterId: newRosterId });
+    const pool = latestMapPool(series);
+    addSeries({
+      opponent: o,
+      date,
+      format,
+      rosterId: newRosterId,
+      ...(pool.length > 0 && { pickBan: { pool, team1: 'us', moves: [] } }),
+    });
     setOpponent('');
     setDate(today);
     setFormat('BO3');
