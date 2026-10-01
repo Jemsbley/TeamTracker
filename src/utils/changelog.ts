@@ -8,7 +8,7 @@ export type ChangelogEntry = {
 
 /**
  * Format a release date for display. The `T00:00:00` suffix forces local-time
- * parsing — a bare `YYYY-MM-DD` is read as UTC, which renders a day early in
+ * parsing. A bare `YYYY-MM-DD` is read as UTC, which renders a day early in
  * any negative-offset timezone.
  */
 export function formatReleaseDate(iso: string): string {
@@ -22,13 +22,22 @@ export function formatReleaseDate(iso: string): string {
 // Newest first.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.1',
+    date: '2026-10-01',
+    title: 'Map pool autofill',
+    changes: [
+      'New series start with the map pool from your most recent series already filled in, so you only need to swap the maps that rotated',
+      'On a series, "Import from tracker.gg" is now the primary button above "Fill in stats"',
+    ],
+  },
+  {
     version: '1.2.0',
     date: '2026-09-23',
     title: 'Round% and stat fixes',
     changes: [
       'Added a Round% tab to Stats: filter rounds by side, first blood/first death, map, spike plant (and site), multikills, kills, deaths, and assists, and see what share of those rounds we win',
       'Kill/death/assist/multikill and plant-site filters read the round-by-round detail stored with tracker.gg imports',
-      'Tracker.gg imports no longer count 2k rounds as multikills — MK is now rounds with 3+ kills',
+      'Tracker.gg imports no longer count 2k rounds as multikills. MK is now rounds with 3+ kills',
       'Corrected MK on games already imported from tracker.gg',
       'Maps: Ban% and Opp Ban% are now the share of series in which the map was banned, not the share of that team\'s total bans',
     ],

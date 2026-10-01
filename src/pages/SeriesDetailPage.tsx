@@ -421,11 +421,11 @@ function PresetSlot({
         )}
       </div>
       <div className="flex flex-col gap-2">
-        <WriteButton canEdit={canEdit} className="btn-primary" onClick={onFill}>
-          Fill in stats →
-        </WriteButton>
-        <WriteButton canEdit={canEdit} className="btn-ghost" onClick={onImport}>
+        <WriteButton canEdit={canEdit} className="btn-primary" onClick={onImport}>
           Import from tracker.gg
+        </WriteButton>
+        <WriteButton canEdit={canEdit} className="btn-ghost" onClick={onFill}>
+          Fill in stats →
         </WriteButton>
       </div>
     </div>
