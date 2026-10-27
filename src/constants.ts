@@ -16,6 +16,12 @@ export const MAPS: ValorantMap[] = [
   'Sunset',
 ];
 
+/** Bomb sites per map — Haven and Lotus have a C site, everything else is
+ * A/B. */
+export const MAP_SITES: Record<ValorantMap, string[]> = Object.fromEntries(
+  MAPS.map((m) => [m, m === 'Haven' || m === 'Lotus' ? ['A', 'B', 'C'] : ['A', 'B']])
+) as Record<ValorantMap, string[]>;
+
 const sortAlpha = (xs: string[]) => [...xs].sort((a, b) => a.localeCompare(b));
 
 export const AGENTS_BY_CLASS: Record<AgentClass, string[]> = {

@@ -105,7 +105,8 @@ export default function PlayerStatsTable({
     return out;
   }, [playerRows]);
 
-  /** Comparison delta as a green up-caret / red down-caret subscript. */
+  /** Comparison delta as an up/down caret subscript, green when the change is
+   * an improvement (so a rise in a lower-is-better stat reads red). */
   const renderDelta = (col: Col, agg: Aggregate, cmp: Aggregate | null) => {
     if (col.key === 'name' || !cmp) return null;
     if (agg.games === 0 || cmp.games === 0) return null;
@@ -118,11 +119,12 @@ export default function PlayerStatsTable({
     const diff = Number((cur - base).toFixed(digits));
     if (diff === 0) return null;
     const up = diff > 0;
+    const better = col.bestIsLow ? !up : up;
     const mag = Math.abs(diff).toFixed(digits);
     return (
       <span
         className={`block text-xs leading-none mt-0.5 ${
-          up ? 'text-green-400' : 'text-red-400'
+          better ? 'text-green-400' : 'text-red-400'
         }`}
       >
         {up ? '▲' : '▼'}

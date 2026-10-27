@@ -1,22 +1,28 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
+  parseAsArrayOf,
   parseAsBoolean,
   parseAsFloat,
   parseAsString,
   parseAsStringEnum,
   useQueryState,
 } from 'nuqs';
+import AgentIcon from '../components/AgentIcon';
 import DateRangePicker from '../components/DateRangePicker';
 import GettingStarted from '../components/GettingStarted';
 import MapPicker from '../components/MapPicker';
+import MultiSelect from '../components/MultiSelect';
 import PageHeader from '../components/PageHeader';
-import HeatmapCanvas from '../components/heatmap/HeatmapCanvas';
-import { AGENT_CLASS, CLASS_LABEL, MAPS } from '../constants';
+import HeatmapCanvas, {
+  type HeatmapGameInfo,
+} from '../components/heatmap/HeatmapCanvas';
+import { AGENT_CLASS, CLASS_LABEL, MAPS, MAP_SITES } from '../constants';
 import { useStore } from '../store';
 import { minimapUrl } from '../utils/minimapIcon';
 import { ALL_ROSTERS, resolveRosterFilter } from '../utils/rosters';
 import {
   buildHeatmapMatchFromRawExport,
+  invertHeatmapEvents,
   isHeatmapRawExport,
   mergeHeatmapMatches,
   type HeatmapMatch,
@@ -36,6 +42,7 @@ function formatTime(seconds: number): string {
 
 type Mode = 'both' | 'kills' | 'deaths';
 type SideFilter = 'both' | 'attack' | 'defense';
+type PlantFilter = 'both' | 'pre' | 'post';
 
 const MODES: { key: Mode; label: string }[] = [
   { key: 'both', label: 'Both' },
@@ -46,6 +53,11 @@ const SIDES: { key: SideFilter; label: string }[] = [
   { key: 'both', label: 'Both sides' },
   { key: 'attack', label: 'Attack' },
   { key: 'defense', label: 'Defense' },
+];
+const PLANTS: { key: PlantFilter; label: string }[] = [
+  { key: 'both', label: 'Both' },
+  { key: 'pre', label: 'Pre-plant' },
+  { key: 'post', label: 'Post-plant' },
 ];
 
 // Thumb-only styling so the transparent track of each stacked <input> lets
@@ -67,18 +79,22 @@ const RANGE_THUMB_CLASS =
 function TimelineRange({
   start,
   end,
+  min,
   max,
   onChangeStart,
   onChangeEnd,
 }: {
   start: number;
   end: number;
+  min: number;
   max: number;
   onChangeStart: (v: number) => void;
   onChangeEnd: (v: number) => void;
 }) {
-  const startPct = (start / max) * 100;
-  const endPct = (end / max) * 100;
+  const span = max - min || 1;
+  const startPct = ((start - min) / span) * 100;
+  const endPct = ((end - min) / span) * 100;
+  const mid = min + span / 2;
   return (
     <div className="relative flex-1 h-3.5">
       <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-valorant-panel2" />
@@ -88,23 +104,23 @@ function TimelineRange({
       />
       <input
         type="range"
-        min={0}
+        min={min}
         max={max}
         step={1}
         value={start}
         onChange={(e) => onChangeStart(Math.min(Number(e.target.value), end))}
         className={RANGE_THUMB_CLASS}
-        style={{ zIndex: start > max / 2 ? 5 : 3 }}
+        style={{ zIndex: start > mid ? 5 : 3 }}
       />
       <input
         type="range"
-        min={0}
+        min={min}
         max={max}
         step={1}
         value={end}
         onChange={(e) => onChangeEnd(Math.max(Number(e.target.value), start))}
         className={RANGE_THUMB_CLASS}
-        style={{ zIndex: end > max / 2 ? 3 : 5 }}
+        style={{ zIndex: end > mid ? 3 : 5 }}
       />
     </div>
   );
@@ -139,6 +155,20 @@ function Segmented<T extends string>({
   );
 }
 
+/** A small "?" badge that reveals its children as a tooltip on hover. */
+function HelpTip({ children }: { children: ReactNode }) {
+  return (
+    <span className="group relative flex -translate-y-px">
+      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-white/30 text-[10px] font-bold text-valorant-muted cursor-help">
+        ?
+      </span>
+      <span className="pointer-events-none absolute right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 bottom-full mb-2 z-20 w-64 rounded-md border border-white/10 bg-valorant-panel px-2.5 py-1.5 text-xs text-white shadow-lg opacity-0 transition-opacity duration-100 group-hover:opacity-100">
+        {children}
+      </span>
+    </span>
+  );
+}
+
 export default function HeatmapPage() {
   const rosters = useStore((s) => s.rosters);
   const allSeries = useStore((s) => s.series);
@@ -168,17 +198,17 @@ export default function HeatmapPage() {
       'both'
     )
   );
-  const [player, setPlayer] = useQueryState(
+  const [players, setPlayers] = useQueryState(
     'player',
-    parseAsString.withDefault('')
+    parseAsArrayOf(parseAsString).withDefault([])
   );
-  const [agent, setAgent] = useQueryState(
+  const [agents, setAgents] = useQueryState(
     'agent',
-    parseAsString.withDefault('')
+    parseAsArrayOf(parseAsString).withDefault([])
   );
-  const [agentClass, setAgentClass] = useQueryState(
+  const [agentClasses, setAgentClasses] = useQueryState(
     'class',
-    parseAsString.withDefault('')
+    parseAsArrayOf(parseAsString).withDefault([])
   );
   const [roundStart, setRoundStart] = useQueryState(
     'roundStart',
@@ -188,10 +218,21 @@ export default function HeatmapPage() {
     'roundEnd',
     parseAsFloat.withDefault(TIMELINE_MAX_SECONDS)
   );
-  const [afterPlantOnly, setAfterPlantOnly] = useQueryState(
-    'afterPlant',
+  const [plant, setPlant] = useQueryState(
+    'plant',
+    parseAsStringEnum<PlantFilter>(['both', 'pre', 'post']).withDefault('both')
+  );
+  const [plantSites, setPlantSites] = useQueryState(
+    'sites',
+    parseAsArrayOf(parseAsString).withDefault([])
+  );
+  const [inverted, setInverted] = useQueryState(
+    'invert',
     parseAsBoolean.withDefault(false)
   );
+  // Ignore sites left in the URL that the current map doesn't have.
+  const mapSites = MAP_SITES[mapFilter];
+  const activeSites = plantSites.filter((s) => mapSites.includes(s));
 
   // "Show points" overlays the raw kill/death dots at 50% opacity alongside
   // the heatmap. "Just points" is a calibration mode: it turns the blurred
@@ -296,7 +337,7 @@ export default function HeatmapPage() {
   const parsedMatches = useMemo(
     () =>
       mapScopedGames.map((g) =>
-        buildHeatmapMatchFromRawExport(g.rawJson as RawExport)
+        buildHeatmapMatchFromRawExport(g.rawJson as RawExport, g.id)
       ),
     [mapScopedGames]
   );
@@ -304,6 +345,19 @@ export default function HeatmapPage() {
     () => mergeHeatmapMatches(parsedMatches, anchorIdentifiers, nameByIdentifier),
     [parsedMatches, anchorIdentifiers, nameByIdentifier]
   );
+
+  const gameInfo = useMemo(() => {
+    const seriesById = new Map(allSeries.map((s) => [s.id, s]));
+    return new Map<string, HeatmapGameInfo>(
+      mapScopedGames.map((g) => {
+        const series = seriesById.get(g.seriesId);
+        return [
+          g.id,
+          { date: g.date, series: series ? `vs. ${series.opponent}` : 'Unknown' },
+        ];
+      })
+    );
+  }, [mapScopedGames, allSeries]);
 
   const emptyMessage = useMemo(() => {
     if (gamesWithRawData.length === 0) {
@@ -319,6 +373,10 @@ export default function HeatmapPage() {
   }, [gamesWithRawData, mapScopedGames, mapFilter, match]);
 
   const teamPlayers = useMemo(() => match?.players ?? [], [match]);
+  const playerNames = useMemo(
+    () => new Map(teamPlayers.map((p) => [p.id, p.appName ?? p.id])),
+    [teamPlayers]
+  );
   const teamAgents = useMemo(
     () => Array.from(new Set(teamPlayers.map((p) => p.agent))).sort(),
     [teamPlayers]
@@ -339,59 +397,108 @@ export default function HeatmapPage() {
   // match changes, rather than silently showing an empty heatmap.
   useEffect(() => {
     if (!match) return;
-    if (player && !teamPlayers.some((p) => p.id === player)) setPlayer('');
-    if (agent && !teamAgents.includes(agent)) setAgent('');
-    if (agentClass && !teamClasses.includes(agentClass as AgentClass))
-      setAgentClass('');
+    const keepPlayers = players.filter((id) => teamPlayers.some((p) => p.id === id));
+    if (keepPlayers.length !== players.length) setPlayers(keepPlayers);
+    const keepAgents = agents.filter((a) => teamAgents.includes(a));
+    if (keepAgents.length !== agents.length) setAgents(keepAgents);
+    const keepClasses = agentClasses.filter((c) =>
+      teamClasses.includes(c as AgentClass)
+    );
+    if (keepClasses.length !== agentClasses.length) setAgentClasses(keepClasses);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [match]);
 
-  const pickAgent = (a: string) => {
-    setAgent(a);
-    if (a) setAgentClass('');
+  // Agent and class filters are mutually exclusive — picking one clears the
+  // other, so they never intersect into an empty selection.
+  const pickAgents = (a: string[]) => {
+    setAgents(a);
+    if (a.length > 0) setAgentClasses([]);
   };
-  const pickClass = (c: string) => {
-    setAgentClass(c);
-    if (c) setAgent('');
+  const pickClasses = (c: string[]) => {
+    setAgentClasses(c);
+    if (c.length > 0) setAgents([]);
   };
+
+  // Pre-plant caps the timeline at the latest plant; post-plant floors it at
+  // the earliest one, so the slider can't be dragged into a window that
+  // can't hold any dots. Only plants on the selected sites count. The URL
+  // values are clamped for display/filtering rather than rewritten, so
+  // switching back to "Both" restores them.
+  const plantSeconds = useMemo(
+    () =>
+      (match?.plants ?? [])
+        .filter((p) => activeSites.length === 0 || activeSites.includes(p.site))
+        .map((p) => p.time / 1000),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [match, activeSites.join()]
+  );
+  const timelineMin =
+    plant === 'post' && plantSeconds.length > 0
+      ? Math.floor(Math.min(...plantSeconds))
+      : 0;
+  const timelineMax =
+    plant === 'pre' && plantSeconds.length > 0
+      ? Math.ceil(Math.max(...plantSeconds))
+      : TIMELINE_MAX_SECONDS;
+  const clampTime = (t: number) => Math.min(timelineMax, Math.max(timelineMin, t));
+  const timeStart = clampTime(roundStart);
+  const timeEnd = clampTime(roundEnd);
 
   const filteredEvents = useMemo(() => {
     if (!match) return [];
-    const startMs = roundStart * 1000;
-    const endMs = roundEnd * 1000;
+    const startMs = timeStart * 1000;
+    const endMs = timeEnd * 1000;
     return match.events.filter((e) => {
       if (mode === 'kills' && e.kind !== 'kill') return false;
       if (mode === 'deaths' && e.kind !== 'death') return false;
       if (side === 'attack' && e.side !== 'attacker') return false;
       if (side === 'defense' && e.side !== 'defender') return false;
-      if (player && e.player !== player) return false;
-      if (agent && e.agent !== agent) return false;
-      if (agentClass && AGENT_CLASS[e.agent] !== agentClass) return false;
+      if (players.length > 0 && !players.includes(e.player)) return false;
+      if (agents.length > 0 && !agents.includes(e.agent)) return false;
+      if (
+        agentClasses.length > 0 &&
+        !agentClasses.includes(AGENT_CLASS[e.agent] ?? '')
+      )
+        return false;
       if (e.roundTime < startMs || e.roundTime > endMs) return false;
-      if (afterPlantOnly && !e.afterPlant) return false;
+      if (plant === 'pre' && e.afterPlant) return false;
+      if (plant === 'post' && !e.afterPlant) return false;
+      if (
+        activeSites.length > 0 &&
+        !(e.plantSite && activeSites.includes(e.plantSite))
+      )
+        return false;
       return true;
     });
   }, [
     match,
     mode,
     side,
-    player,
-    agent,
-    agentClass,
-    roundStart,
-    roundEnd,
-    afterPlantOnly,
+    players,
+    agents,
+    agentClasses,
+    timeStart,
+    timeEnd,
+    plant,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    activeSites.join(),
   ]);
+
+  // Inverting re-centers each dot on the enemy in that engagement.
+  const displayedEvents = useMemo(
+    () => (inverted ? invertHeatmapEvents(filteredEvents) : filteredEvents),
+    [filteredEvents, inverted]
+  );
 
   const counts = useMemo(() => {
     let kills = 0;
     let deaths = 0;
-    for (const e of filteredEvents) {
+    for (const e of displayedEvents) {
       if (e.kind === 'kill') kills += 1;
       else deaths += 1;
     }
     return { kills, deaths };
-  }, [filteredEvents]);
+  }, [displayedEvents]);
 
   const hasActiveFilters =
     rosterParam !== null ||
@@ -401,12 +508,14 @@ export default function HeatmapPage() {
     endDate !== null ||
     mode !== 'both' ||
     side !== 'both' ||
-    player !== '' ||
-    agent !== '' ||
-    agentClass !== '' ||
+    players.length > 0 ||
+    agents.length > 0 ||
+    agentClasses.length > 0 ||
     roundStart !== 0 ||
     roundEnd !== TIMELINE_MAX_SECONDS ||
-    afterPlantOnly;
+    plant !== 'both' ||
+    activeSites.length > 0 ||
+    inverted;
 
   const resetFilters = () => {
     setRosterParam(null);
@@ -416,12 +525,14 @@ export default function HeatmapPage() {
     setEndDate(null);
     setMode('both');
     setSide('both');
-    setPlayer('');
-    setAgent('');
-    setAgentClass('');
+    setPlayers([]);
+    setAgents([]);
+    setAgentClasses([]);
     setRoundStart(0);
     setRoundEnd(TIMELINE_MAX_SECONDS);
-    setAfterPlantOnly(false);
+    setPlant('both');
+    setPlantSites([]);
+    setInverted(false);
   };
 
   if (rosters.length === 0 || allSeries.length === 0) {
@@ -510,137 +621,178 @@ export default function HeatmapPage() {
         </div>
       </PageHeader>
 
-      <div className="card flex flex-wrap items-end gap-4">
-        <label className="min-w-[180px]">
-          <div className="label">Player</div>
-          <select
-            className="input"
-            value={player}
-            onChange={(e) => setPlayer(e.target.value)}
-          >
-            <option value="">All players</option>
-            {teamPlayers.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.appName ?? p.id} ({p.agent})
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="min-w-[160px]">
-          <div className="label">Agent</div>
-          <select
-            className="input"
-            value={agent}
-            onChange={(e) => pickAgent(e.target.value)}
-          >
-            <option value="">All agents</option>
-            {teamAgents.map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="min-w-[160px]">
-          <div className="label">Agent class</div>
-          <select
-            className="input"
-            value={agentClass}
-            onChange={(e) => pickClass(e.target.value)}
-          >
-            <option value="">All classes</option>
-            {teamClasses.map((c) => (
-              <option key={c} value={c}>
-                {CLASS_LABEL[c]}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="ml-auto flex items-center gap-4 text-sm">
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#0ca30c]" />
-            <span className="text-valorant-muted">
-              Kills: <span className="text-white font-semibold">{counts.kills}</span>
-            </span>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#d03b3b]" />
-            <span className="text-valorant-muted">
-              Deaths: <span className="text-white font-semibold">{counts.deaths}</span>
-            </span>
-          </span>
-        </div>
-      </div>
-
-      <div className="card flex flex-wrap items-center gap-x-6 gap-y-3">
-        <span className="text-xs text-valorant-muted tabular-nums w-10">
-          {formatTime(roundStart)}
-        </span>
-        <TimelineRange
-          start={roundStart}
-          end={roundEnd}
-          max={TIMELINE_MAX_SECONDS}
-          onChangeStart={setRoundStart}
-          onChangeEnd={setRoundEnd}
-        />
-        <span className="text-xs text-valorant-muted tabular-nums w-10 text-right">
-          {formatTime(roundEnd)}
-        </span>
-
-        <label className="flex items-center gap-2 text-sm text-valorant-accent whitespace-nowrap">
-          <input
-            type="checkbox"
-            checked={afterPlantOnly}
-            onChange={(e) => setAfterPlantOnly(e.target.checked)}
-          />
-          After spike plant only
-        </label>
-      </div>
-
       {emptyMessage && <div className="card text-valorant-muted">{emptyMessage}</div>}
 
-      {match && (
-        <div className="flex flex-wrap gap-4 items-start">
-          <div className="flex-1 min-w-[320px] max-w-[720px]">
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
+        {match && (
+          <div className="w-full lg:w-[720px] lg:max-w-[60%] shrink-0">
             <HeatmapCanvas
               imageUrl={minimapUrl(match.map) ?? ''}
               mapDetails={match.mapDetails}
-              events={filteredEvents}
+              events={displayedEvents}
               heatmapEnabled={heatmapEnabled}
               pointsOpacity={pointsOpacity}
+              playerNames={playerNames}
+              gameInfo={gameInfo}
+              inverted={inverted}
+            />
+          </div>
+        )}
+
+        <div className="card w-full lg:flex-1 lg:min-w-0 space-y-5">
+          <div className="flex items-center gap-6 text-lg pb-4 border-b border-white/5">
+            <span className="flex items-center gap-2">
+              <span className="inline-block w-4 h-4 rounded-full bg-[#0ca30c]" />
+              <span className="text-valorant-muted">
+                Kills: <span className="text-white text-2xl font-bold tabular-nums">{counts.kills}</span>
+              </span>
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="inline-block w-4 h-4 rounded-full bg-[#d03b3b]" />
+              <span className="text-valorant-muted">
+                Deaths: <span className="text-white text-2xl font-bold tabular-nums">{counts.deaths}</span>
+              </span>
+            </span>
+          </div>
+          <div>
+            <div className="label">Player</div>
+            <MultiSelect
+              values={players}
+              onChange={setPlayers}
+              emptyLabel="All players"
+              noun="players"
+              options={teamPlayers.map((p) => ({
+                value: p.id,
+                label: p.appName ?? p.id,
+                icon: <AgentIcon agent={p.agent} size={20} className="shrink-0" />,
+              }))}
             />
           </div>
 
-          <div className="card w-full sm:w-[280px] space-y-4 shrink-0">
-            <h3>Display</h3>
-            <label className="flex items-center gap-2 text-sm text-valorant-accent">
-              <input
-                type="checkbox"
-                checked={showPoints}
-                disabled={justPoints}
-                onChange={(e) => setShowPoints(e.target.checked)}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="min-w-0">
+              <div className="label">Agent</div>
+              <MultiSelect
+                values={agents}
+                onChange={pickAgents}
+                emptyLabel="All agents"
+                noun="agents"
+                options={teamAgents.map((a) => ({
+                  value: a,
+                  label: a,
+                  icon: <AgentIcon agent={a} size={20} className="shrink-0" />,
+                }))}
               />
-              Show points (50% opacity)
-            </label>
-            <label className="flex items-center gap-2 text-sm text-valorant-accent">
-              <input
-                type="checkbox"
-                checked={justPoints}
-                onChange={(e) => setJustPoints(e.target.checked)}
+            </div>
+            <div className="min-w-0">
+              <div className="label">Agent class</div>
+              <MultiSelect
+                values={agentClasses}
+                onChange={pickClasses}
+                emptyLabel="All classes"
+                noun="classes"
+                options={teamClasses.map((c) => ({ value: c, label: CLASS_LABEL[c] }))}
               />
-              Just points
-            </label>
-            <p className="text-xs text-valorant-muted">
-              &quot;Just points&quot; turns off the blurred heatmap and shows
-              the raw kill/death dots at full opacity — useful for
-              sanity-checking the coordinate mapping against known callouts.
-            </p>
+            </div>
           </div>
+
+          <div>
+            <div className="label">Round time</div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-valorant-muted tabular-nums w-9">
+                {formatTime(timeStart)}
+              </span>
+              <TimelineRange
+                start={timeStart}
+                end={timeEnd}
+                min={timelineMin}
+                max={timelineMax}
+                onChangeStart={setRoundStart}
+                onChangeEnd={setRoundEnd}
+              />
+              <span className="text-xs text-valorant-muted tabular-nums w-9 text-right">
+                {formatTime(timeEnd)}
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <div className="label">Spike</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Segmented value={plant} options={PLANTS} onChange={setPlant} />
+              <div className="flex items-center gap-1">
+                {mapSites.map((site) => {
+                  const on = activeSites.includes(site);
+                  return (
+                    <button
+                      key={site}
+                      type="button"
+                      onClick={() =>
+                        setPlantSites(
+                          on
+                            ? activeSites.filter((x) => x !== site)
+                            : [...activeSites, site].sort()
+                        )
+                      }
+                      className={`w-8 py-1 rounded text-sm font-semibold border transition-colors hover:text-white ${
+                        on
+                          ? 'bg-valorant-red text-white border-valorant-red'
+                          : 'bg-valorant-panel2/40 text-valorant-muted border-white/10'
+                      }`}
+                    >
+                      {site}
+                    </button>
+                  );
+                })}
+              </div>
+              <HelpTip>
+                Select for rounds where the spike was at some point planted on
+                that site
+              </HelpTip>
+            </div>
+          </div>
+
+          <div>
+            <div className="label">Display</div>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+              <label className="flex items-center gap-2 text-sm text-valorant-accent whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={showPoints}
+                  disabled={justPoints}
+                  onChange={(e) => setShowPoints(e.target.checked)}
+                />
+                Show points (50% opacity)
+              </label>
+              <label className="flex items-center gap-2 text-sm text-valorant-accent whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={justPoints}
+                  onChange={(e) => setJustPoints(e.target.checked)}
+                />
+                Just points
+              </label>
+              <div className="flex items-center gap-1.5">
+                <label className="flex items-center gap-2 text-sm text-valorant-accent whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={inverted}
+                    onChange={(e) => setInverted(e.target.checked)}
+                  />
+                  Invert
+                </label>
+                <HelpTip>
+                  Inverting the heatmap shows where enemies stand most
+                  frequently when kills occur in your matches. Green
+                  represents locations where opponents stand when you kill
+                  them, red the opposite.
+                </HelpTip>
+              </div>
+            </div>
+          </div>
+
         </div>
-      )}
+      </div>
     </div>
   );
 }

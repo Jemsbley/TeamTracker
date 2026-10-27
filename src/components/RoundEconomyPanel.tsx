@@ -2,12 +2,14 @@ import type { RoundEconomy } from '../utils/rounds';
 import { pct } from '../utils/rounds';
 
 /**
- * Interpolate between pastel rose red (0%) and pastel lime green (100%).
+ * Interpolate between pastel rose red (0%) and pastel lime green (100%), or
+ * the reverse for lower-is-better rates.
  * Returns undefined when there's no sample (so the value renders neutral).
  */
-function pctColor(wins: number, total: number): string | undefined {
+function pctColor(wins: number, total: number, lowerIsBetter?: boolean): string | undefined {
   if (total === 0) return undefined;
-  const t = Math.max(0, Math.min(1, wins / total));
+  const rate = Math.max(0, Math.min(1, wins / total));
+  const t = lowerIsBetter ? 1 - rate : rate;
   const r = Math.round(255 + (186 - 255) * t);
   const g = Math.round(179 + (255 - 179) * t);
   const b = Math.round(186 + (179 - 186) * t);
@@ -17,16 +19,28 @@ function pctColor(wins: number, total: number): string | undefined {
 type Rate = { wins: number; total: number };
 
 /**
- * Percentage-point change of a rate vs. a baseline, as a green up-caret /
- * red down-caret subscript. Null when either side has no sample or no change.
+ * Percentage-point change of a rate vs. a baseline, as an up/down caret
+ * subscript, green when the change is an improvement.
+ * Null when either side has no sample or no change.
  */
-function RateDelta({ wins, total, cmp }: { wins: number; total: number; cmp?: Rate }) {
+function RateDelta({
+  wins,
+  total,
+  cmp,
+  lowerIsBetter,
+}: {
+  wins: number;
+  total: number;
+  cmp?: Rate;
+  lowerIsBetter?: boolean;
+}) {
   if (!cmp || !total || !cmp.total) return null;
   const diff = Math.round((wins / total) * 100 - (cmp.wins / cmp.total) * 100);
   if (diff === 0) return null;
   const up = diff > 0;
+  const better = lowerIsBetter ? !up : up;
   return (
-    <div className={`text-[11px] leading-none mt-1 font-semibold ${up ? 'text-green-400' : 'text-red-400'}`}>
+    <div className={`text-[11px] leading-none mt-1 font-semibold ${better ? 'text-green-400' : 'text-red-400'}`}>
       {up ? '▲' : '▼'}
       {Math.abs(diff)}
     </div>
@@ -176,6 +190,7 @@ export default function RoundEconomyPanel({
               wins={economy.defense.plantsAllowed}
               total={economy.defense.rounds}
               compact={compact}
+              lowerIsBetter
               cmp={
                 compare
                   ? {
@@ -290,6 +305,7 @@ function Cell({
   total,
   compact,
   cmp,
+  lowerIsBetter,
 }: {
   label: string;
   tooltip: string;
@@ -297,8 +313,10 @@ function Cell({
   total: number;
   compact?: boolean;
   cmp?: Rate;
+  /** Higher rates are bad (e.g. plants allowed): inverts the color scale. */
+  lowerIsBetter?: boolean;
 }) {
-  const color = pctColor(wins, total);
+  const color = pctColor(wins, total, lowerIsBetter);
   return (
     <div className="stat-box" title={tooltip}>
       <div className="stat-box-label">{label}</div>
@@ -308,7 +326,7 @@ function Cell({
       >
         {pct(wins, total)}
       </div>
-      <RateDelta wins={wins} total={total} cmp={cmp} />
+      <RateDelta wins={wins} total={total} cmp={cmp} lowerIsBetter={lowerIsBetter} />
       {!compact && <div className="stat-box-sub">{wins}/{total}</div>}
     </div>
   );

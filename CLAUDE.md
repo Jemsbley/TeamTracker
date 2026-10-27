@@ -75,13 +75,25 @@ sweep and report findings plainly, including the ones you didn't act on.
   call into these.
 - **Maps and agents come from [constants.ts](src/constants.ts)**, with art in
   `src/assets/`. New agent or map = add it there, add the image, done.
-- **Releases are user-visible.** A version chip in the header opens a changelog
-  modal fed by `src/utils/changelog.ts`. When a branch adds something a user
-  would notice, bump `package.json` and add or extend the top changelog entry in
-  the same breath.
+- **Every user-visible change ships with a changelog entry — always, without
+  being asked.** The version chip in the header shows `CHANGELOG[0].version`
+  from [changelog.ts](src/utils/changelog.ts) and opens a modal listing every
+  entry. So in the same change that adds anything a user would notice:
+  - If this branch hasn't bumped the version yet, bump `package.json` (patch
+    for fixes/small tweaks, minor for new features) and add a new entry at the
+    top of `CHANGELOG` with the same version. If it already has, add lines to
+    that top entry instead of making a second one — one entry per branch.
+  - Keep `package.json` and the top entry's version identical; that's what the
+    chip displays.
+  - Set the top entry's `date` to today's date whenever you add to it.
+  - Write each line for a teammate, not a developer: what changed and where to
+    find it, no file names or implementation detail.
+  Before finishing, check `package.json`, the top `CHANGELOG` entry, and the
+  chip all agree.
 - **Branches are `<issue-number>-<slug>`** (`1-heatmaps`, `2-scrims`). At the end
-  of a branch I'll often ask you to write a `PR.md` describing it. Commit
-  messages are short and lowercase; don't commit or push unless I ask.
+  of a branch I'll often ask you to write up what it did; that goes in
+  `changelogs/<issue-number>-changelog.md` (see the existing ones for shape).
+  Commit messages are short and lowercase; don't commit or push unless I ask.
 
 ## Verifying work
 
