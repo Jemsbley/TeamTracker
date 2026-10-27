@@ -67,10 +67,23 @@ export type RoundActor = {
   assists: number;
 };
 
+/** One moment in a round: how many players each team had alive, and which of
+ * our roster players were among them. */
+export type AliveState = {
+  us: number;
+  them: number;
+  /** Roster player ids. Players the import couldn't match to the roster are
+   * counted in `us` but never listed here. */
+  ourAlive: string[];
+};
+
 export type RoundDetail = {
   plantSite?: PlantSite;
   /** Our team only — the opponent's per-round lines are never filtered on. */
   actors: RoundActor[];
+  /** Every player-count layout the round passed through, in order, starting
+   * from the full-strength opener (normally 5v5). */
+  states: AliveState[];
 };
 
 /** Per-round detail for one game, index-aligned with `game.rounds`. */
@@ -196,7 +209,49 @@ function buildGameDetail(game: Game): GameDetail | null {
         ? (site as PlantSite)
         : undefined,
       actors: [],
+      states: [],
     };
+  });
+
+  // Replay each round's kill feed to get the alive counts it passed through.
+  const teamByIdentifier = new Map(summaries.map((s) => [s.identifier, s.team]));
+  const ourIdentifiers = summaries.filter((s) => s.team === us).map((s) => s.identifier);
+  const theirCount = summaries.length - ourIdentifiers.length;
+  const killsByRound = new Map<number, Array<{ time: number; victim: string }>>();
+  for (const s of segs) {
+    if (s.type !== 'player-round-kills') continue;
+    const idx = indexByRoundNumber.get(roundAttr(s));
+    if (idx === undefined) continue;
+    const victim = str(s.attributes?.opponentPlatformUserIdentifier);
+    if (!teamByIdentifier.has(victim)) continue;
+    const time = Number(s.metadata?.roundTime);
+    const list = killsByRound.get(idx) ?? [];
+    list.push({ time: Number.isFinite(time) ? time : 0, victim });
+    killsByRound.set(idx, list);
+  }
+  rounds.forEach((rd, idx) => {
+    const ourAlive = new Set(ourIdentifiers);
+    const theirDead = new Set<string>();
+    const snapshot = (): AliveState => ({
+      us: ourAlive.size,
+      them: theirCount - theirDead.size,
+      ourAlive: [...ourAlive]
+        .map((id) => playerIdByIdentifier.get(id))
+        .filter((id): id is string => !!id),
+    });
+    rd.states.push(snapshot());
+    const kills = (killsByRound.get(idx) ?? []).sort((a, b) => a.time - b.time);
+    // Kills sharing a timestamp (a trade on the same tick) land together, so
+    // the in-between layout that never really existed isn't recorded.
+    for (let k = 0; k < kills.length; ) {
+      const time = kills[k].time;
+      for (; k < kills.length && kills[k].time === time; k++) {
+        const victim = kills[k].victim;
+        if (teamByIdentifier.get(victim) === us) ourAlive.delete(victim);
+        else theirDead.add(victim);
+      }
+      rd.states.push(snapshot());
+    }
   });
 
   for (const s of segs) {
@@ -256,6 +311,12 @@ export type RoundPctFilters = {
   deaths: string[];
   /** Every listed subject must have gotten an assist in the round. */
   assists: string[];
+  /** XvX: our alive count at some moment in the round. null = any (X). */
+  aliveUs: number | null;
+  /** XvX: their alive count at that same moment. null = any (X). */
+  aliveThem: number | null;
+  /** XvX: roster player ids that must all be alive at that moment. */
+  alivePlayers: string[];
 };
 
 /** True if any filter needs data that only lives in a tracker.gg response. */
@@ -265,7 +326,10 @@ export function needsRoundDetail(f: RoundPctFilters): boolean {
     f.multikill !== '' ||
     f.kills.length > 0 ||
     f.deaths.length > 0 ||
-    f.assists.length > 0
+    f.assists.length > 0 ||
+    f.aliveUs !== null ||
+    f.aliveThem !== null ||
+    f.alivePlayers.length > 0
   );
 }
 
@@ -396,6 +460,16 @@ export function evaluateRoundPct(games: Game[], f: RoundPctFilters): RoundPctRes
       if (!f.kills.every((s) => subjectActed(s, actors, 'kills'))) continue;
       if (!f.deaths.every((s) => subjectActed(s, actors, 'deaths'))) continue;
       if (!f.assists.every((s) => subjectActed(s, actors, 'assists'))) continue;
+
+      if (f.aliveUs !== null || f.aliveThem !== null || f.alivePlayers.length > 0) {
+        const hit = (rd?.states ?? []).some(
+          (st) =>
+            (f.aliveUs === null || st.us === f.aliveUs) &&
+            (f.aliveThem === null || st.them === f.aliveThem) &&
+            f.alivePlayers.every((id) => st.ourAlive.includes(id))
+        );
+        if (!hit) continue;
+      }
 
       const won = r.result === 'W';
       bump(overall, won);

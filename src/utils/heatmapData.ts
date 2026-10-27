@@ -6,6 +6,9 @@ export type EventKind = 'kill' | 'death';
  * the team/side/agent of whichever player the point represents (the killer
  * for a "kill" point, the victim for a "death" point). */
 export type HeatmapEvent = {
+  /** The Game this event was imported from, for the hover tooltip's
+   * date/series line. */
+  gameId: string;
   round: number;
   kind: EventKind;
   team: Team;
@@ -20,6 +23,28 @@ export type HeatmapEvent = {
   /** Whether this happened after the spike was planted in its round (always
    * false for rounds with no plant). */
   afterPlant: boolean;
+  /** Site the spike was planted on in this event's round, if it was. */
+  plantSite?: string;
+  /** Yaw of the point's player at the moment of the kill, in world-space
+   * radians (direction = (cos, sin) in raw x/y). tracker.gg only records view
+   * angles for the killing team, so this is undefined on "death" points. */
+  viewRadians?: number;
+  /** The other player in this interaction — the victim of a kill, or the
+   * killer of a death. */
+  opponent: string;
+  opponentAgent: string;
+  /** The opponent's raw in-game location, when the export recorded it. */
+  opponentX?: number;
+  opponentY?: number;
+  /** The opponent's view yaw, same convention as viewRadians — only known
+   * when the opponent was the killer (i.e. on "death" points). */
+  opponentViewRadians?: number;
+};
+
+export type HeatmapPlant = {
+  /** Round time (ms) the spike went down. */
+  time: number;
+  site: string;
 };
 
 export type RosterEntry = {
@@ -45,6 +70,8 @@ export type HeatmapMatch = {
   mapDetails: MapDetails;
   players: RosterEntry[];
   events: HeatmapEvent[];
+  /** Every spike plant in the match(es). */
+  plants: HeatmapPlant[];
 };
 
 /** Shape of the raw tracker.gg match export — just the fields the
@@ -90,7 +117,10 @@ export function isHeatmapRawExport(raw: unknown): raw is RawExport {
  * guessing is needed); kill positions come from `player-round-kills`, whose
  * `playerLocations` holds the killer's own location (matched by identifier)
  * and whose `opponentLocation` is the victim's location. */
-export function buildHeatmapMatchFromRawExport(raw: RawExport): HeatmapMatch {
+export function buildHeatmapMatchFromRawExport(
+  raw: RawExport,
+  gameId: string
+): HeatmapMatch {
   const segs = raw.data.segments;
 
   const roster = new Map<string, RosterEntry>();
@@ -110,12 +140,18 @@ export function buildHeatmapMatchFromRawExport(raw: RawExport): HeatmapMatch {
     sideByRoundPlayer.set(`${round}:${id}`, meta.teamSide);
   }
 
-  const plantTimeByRound = new Map<number, number>();
+  const plantByRound = new Map<number, HeatmapPlant>();
   for (const s of segs) {
     if (s.type !== 'round-summary') continue;
     const round = s.attributes.round as number;
-    const meta = s.metadata as { plant: { roundTime: number } | null };
-    if (meta.plant) plantTimeByRound.set(round, meta.plant.roundTime);
+    const meta = s.metadata as {
+      plant: { roundTime: number; site?: string } | null;
+    };
+    if (meta.plant)
+      plantByRound.set(round, {
+        time: meta.plant.roundTime,
+        site: (meta.plant.site ?? '').toUpperCase(),
+      });
   }
 
   const events: HeatmapEvent[] = [];
@@ -127,21 +163,28 @@ export function buildHeatmapMatchFromRawExport(raw: RawExport): HeatmapMatch {
     const killer = roster.get(killerId);
     const victim = roster.get(victimId);
     const meta = s.metadata as {
-      playerLocations: { platformUserIdentifier: string; location: { x: number; y: number } }[];
+      playerLocations: {
+        platformUserIdentifier: string;
+        location: { x: number; y: number };
+        viewRadians?: number;
+      }[];
       opponentLocation: { x: number; y: number };
       roundTime: number;
     };
-    const killerLoc = meta.playerLocations.find(
+    const killerEntry = meta.playerLocations.find(
       (l) => l.platformUserIdentifier === killerId
-    )?.location;
+    );
+    const killerLoc = killerEntry?.location;
     const victimLoc = meta.opponentLocation;
     const roundTime = meta.roundTime;
-    const plantTime = plantTimeByRound.get(round);
-    const afterPlant = plantTime !== undefined && roundTime > plantTime;
+    const plant = plantByRound.get(round);
+    const afterPlant = plant !== undefined && roundTime > plant.time;
+    const plantSite = plant?.site || undefined;
 
     if (killer && killerLoc) {
       events.push({
         round,
+        gameId,
         kind: 'kill',
         team: killer.team,
         side: sideByRoundPlayer.get(`${round}:${killerId}`) ?? 'attacker',
@@ -151,11 +194,18 @@ export function buildHeatmapMatchFromRawExport(raw: RawExport): HeatmapMatch {
         y: killerLoc.y,
         roundTime,
         afterPlant,
+        plantSite,
+        viewRadians: killerEntry?.viewRadians,
+        opponent: victimId,
+        opponentAgent: victim?.agent ?? '',
+        opponentX: victimLoc?.x,
+        opponentY: victimLoc?.y,
       });
     }
     if (victim && victimLoc) {
       events.push({
         round,
+        gameId,
         kind: 'death',
         team: victim.team,
         side: sideByRoundPlayer.get(`${round}:${victimId}`) ?? 'attacker',
@@ -165,6 +215,12 @@ export function buildHeatmapMatchFromRawExport(raw: RawExport): HeatmapMatch {
         y: victimLoc.y,
         roundTime,
         afterPlant,
+        plantSite,
+        opponent: killerId,
+        opponentAgent: killer?.agent ?? '',
+        opponentX: killerLoc?.x,
+        opponentY: killerLoc?.y,
+        opponentViewRadians: killerEntry?.viewRadians,
       });
     }
   }
@@ -174,6 +230,7 @@ export function buildHeatmapMatchFromRawExport(raw: RawExport): HeatmapMatch {
     mapDetails: raw.data.metadata.mapDetails,
     players: Array.from(roster.values()),
     events,
+    plants: Array.from(plantByRound.values()),
   };
 }
 
@@ -192,6 +249,7 @@ export function mergeHeatmapMatches(
   const players: RosterEntry[] = [];
   const seenPlayers = new Set<string>();
   const events: HeatmapEvent[] = [];
+  const plants: HeatmapPlant[] = [];
   let mapInfo: Pick<HeatmapMatch, 'map' | 'mapDetails'> | null = null;
 
   for (const m of matches) {
@@ -206,10 +264,38 @@ export function mergeHeatmapMatches(
     for (const e of m.events) {
       if (e.team === anchor.team) events.push(e);
     }
+    plants.push(...m.plants);
   }
 
   if (!mapInfo) return null;
-  return { ...mapInfo, players, events };
+  return { ...mapInfo, players, events, plants };
+}
+
+/** Re-centers each event on the opponent: the point moves to where the
+ * enemy stood, and player/opponent fields swap so the hover tooltip
+ * describes the enemy. `kind` is kept as-is, so green still means "we got
+ * the kill" (enemy positions when we killed them) and red "they did".
+ * Events without a recorded opponent location are dropped. */
+export function invertHeatmapEvents(events: HeatmapEvent[]): HeatmapEvent[] {
+  const out: HeatmapEvent[] = [];
+  for (const e of events) {
+    if (e.opponentX === undefined || e.opponentY === undefined) continue;
+    out.push({
+      ...e,
+      side: e.side === 'attacker' ? 'defender' : 'attacker',
+      player: e.opponent,
+      agent: e.opponentAgent,
+      x: e.opponentX,
+      y: e.opponentY,
+      viewRadians: e.opponentViewRadians,
+      opponent: e.player,
+      opponentAgent: e.agent,
+      opponentX: e.x,
+      opponentY: e.y,
+      opponentViewRadians: e.viewRadians,
+    });
+  }
+  return out;
 }
 
 /** Converts raw in-game coordinates to a 0..1 fraction of the (square)
@@ -231,4 +317,26 @@ export function gameToImageUV(
     u: y * mapDetails.xMultiplier + mapDetails.xScalarToAdd,
     v: x * mapDetails.yMultiplier + mapDetails.yScalarToAdd,
   };
+}
+
+/** Unit vector, in minimap image space, for a world-space view yaw at
+ * (x, y). Projected through gameToImageUV rather than rotated by hand so the
+ * map's axis swap and multiplier signs are applied automatically — verified
+ * against kill data, where the killer's viewRadians points at the victim. */
+export function viewDirectionUV(
+  x: number,
+  y: number,
+  viewRadians: number,
+  mapDetails: MapDetails
+): { du: number; dv: number } {
+  const a = gameToImageUV(x, y, mapDetails);
+  const b = gameToImageUV(
+    x + Math.cos(viewRadians) * 1000,
+    y + Math.sin(viewRadians) * 1000,
+    mapDetails
+  );
+  const du = b.u - a.u;
+  const dv = b.v - a.v;
+  const len = Math.hypot(du, dv) || 1;
+  return { du: du / len, dv: dv / len };
 }

@@ -22,6 +22,22 @@ export function formatReleaseDate(iso: string): string {
 // Newest first.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.0',
+    date: '2026-10-27',
+    title: 'Heatmap overhaul',
+    changes: [
+      'Heatmap player, agent, and class filters now accept multiple selections',
+      'With points shown, hover any dot for its agent, player, side, round time, pre/post-plant, which way they were facing, and who they fought. The opponent appears as a black dot on the map',
+      '"After spike plant only" is now a Both / Pre-plant / Post-plant selector',
+      'Hovering a dot also shows the date and series it came from',
+      'New Invert option: shows where enemies stood when kills happened, instead of where your players stood',
+      'Filter to rounds where the spike was planted on a particular site, with A/B (or A/B/C) toggles for the current map',
+      'All the heatmap filters now sit in one panel beside the map, so the map takes up less room',
+      'Round%: new XvX filter. Pick how many of us and how many of them were alive (1–5, or X for any) to see how often we win rounds that reached that layout, like 3v3 or 2vX. Pick players to require that they were among the ones alive',
+      'Stats where higher is worse now color the right way: a rise in first deaths or plant allowed % shows red, and plant allowed % itself is colored green when low',
+    ],
+  },
+  {
     version: '1.2.1',
     date: '2026-10-01',
     title: 'Map pool autofill',

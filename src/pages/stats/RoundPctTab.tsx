@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { parseAsArrayOf, parseAsString, parseAsStringEnum, useQueryState } from 'nuqs';
 import MapIcon from '../../components/MapIcon';
 import MultiMapPicker from '../../components/MultiMapPicker';
+import MultiSelect from '../../components/MultiSelect';
 import SubjectPicker from '../../components/SubjectPicker';
 import { MAPS } from '../../constants';
 import { pct } from '../../utils/rounds';
@@ -18,6 +19,12 @@ import {
   type Tally,
 } from '../../utils/roundPct';
 import type { Game, Player, Series, ValorantMap } from '../../types';
+
+/** One side of an XvX pick: a player count, or X for any. */
+const ALIVE_OPTIONS = ['X', '1', '2', '3', '4', '5'] as const;
+type AliveOption = (typeof ALIVE_OPTIONS)[number];
+
+const aliveCount = (o: AliveOption): number | null => (o === 'X' ? null : Number(o));
 
 type Props = {
   scopedPlayers: Player[];
@@ -68,6 +75,28 @@ export default function RoundPctTab({ scopedPlayers, scopedSeries, filteredGames
     'rpAssists',
     parseAsArrayOf(parseAsString).withDefault([])
   );
+  const [aliveUs, setAliveUs] = useQueryState(
+    'rpUs',
+    parseAsStringEnum<AliveOption>([...ALIVE_OPTIONS]).withDefault('X')
+  );
+  const [aliveThem, setAliveThem] = useQueryState(
+    'rpThem',
+    parseAsStringEnum<AliveOption>([...ALIVE_OPTIONS]).withDefault('X')
+  );
+  const [alivePlayers, setAlivePlayers] = useQueryState(
+    'rpAlive',
+    parseAsArrayOf(parseAsString).withDefault([])
+  );
+
+  const xvxSet = aliveUs !== 'X' || aliveThem !== 'X';
+  // With a fixed count on our side, at most that many players can be alive.
+  const alivePlayerCap = aliveCount(aliveUs) ?? 5;
+
+  const changeAliveUs = (next: AliveOption) => {
+    void setAliveUs(next === 'X' ? null : next);
+    const cap = aliveCount(next) ?? 5;
+    if (alivePlayers.length > cap) void setAlivePlayers(alivePlayers.slice(-cap));
+  };
 
   const filters: RoundPctFilters = useMemo(
     () => ({
@@ -84,8 +113,29 @@ export default function RoundPctTab({ scopedPlayers, scopedSeries, filteredGames
       kills,
       deaths,
       assists,
+      aliveUs: aliveCount(aliveUs),
+      aliveThem: aliveCount(aliveThem),
+      // Players only narrow an XvX pick; on their own (XvX) they'd match every
+      // round those players played.
+      alivePlayers: xvxSet ? alivePlayers.slice(-alivePlayerCap) : [],
     }),
-    [side, firstEvent, firstSubject, maps, plant, plantSites, multikill, kills, deaths, assists]
+    [
+      side,
+      firstEvent,
+      firstSubject,
+      maps,
+      plant,
+      plantSites,
+      multikill,
+      kills,
+      deaths,
+      assists,
+      aliveUs,
+      aliveThem,
+      xvxSet,
+      alivePlayers,
+      alivePlayerCap,
+    ]
   );
 
   const result = useMemo(
@@ -106,7 +156,9 @@ export default function RoundPctTab({ scopedPlayers, scopedSeries, filteredGames
     multikill !== '' ||
     kills.length > 0 ||
     deaths.length > 0 ||
-    assists.length > 0;
+    assists.length > 0 ||
+    xvxSet ||
+    alivePlayers.length > 0;
 
   const reset = () => {
     setSide(null);
@@ -119,6 +171,9 @@ export default function RoundPctTab({ scopedPlayers, scopedSeries, filteredGames
     setKills(null);
     setDeaths(null);
     setAssists(null);
+    setAliveUs(null);
+    setAliveThem(null);
+    setAlivePlayers(null);
   };
 
   const sitesEnabled = plant === 'yes';
@@ -271,6 +326,33 @@ export default function RoundPctTab({ scopedPlayers, scopedSeries, filteredGames
               onChange={(next) => setAssists(next.length ? next : null)}
               players={scopedPlayers}
             />
+
+            <Field label="XvX">
+              <div className="flex items-center gap-2">
+                <AliveSelect
+                  value={aliveUs}
+                  onChange={changeAliveUs}
+                  label="Our players alive"
+                />
+                <span className="text-sm font-semibold text-valorant-muted">v</span>
+                <AliveSelect
+                  value={aliveThem}
+                  onChange={(next) => setAliveThem(next === 'X' ? null : next)}
+                  label="Their players alive"
+                />
+                <MultiSelect
+                  className="w-44"
+                  values={alivePlayers}
+                  options={scopedPlayers.map((p) => ({ value: p.id, label: p.name }))}
+                  onChange={(next) =>
+                    setAlivePlayers(next.length ? next.slice(-alivePlayerCap) : null)
+                  }
+                  disabled={!xvxSet}
+                  emptyLabel="Any players"
+                  noun="players"
+                />
+              </div>
+            </Field>
           </div>
         </div>
       </div>
@@ -322,8 +404,8 @@ export default function RoundPctTab({ scopedPlayers, scopedSeries, filteredGames
             {result.gamesWithoutDetail > 0
               ? `${result.gamesWithoutDetail} of ${
                   result.gamesConsidered + result.gamesWithoutDetail
-                } maps were skipped — kill, death, assist, multikill, and plant-site filters need the round-by-round detail that only tracker.gg imports carry.`
-              : 'Kill, death, assist, multikill, and plant-site filters read the round-by-round detail from each map’s tracker.gg import.'}
+                } maps were skipped — kill, death, assist, multikill, plant-site, and XvX filters need the round-by-round detail that only tracker.gg imports carry.`
+              : 'Kill, death, assist, multikill, plant-site, and XvX filters read the round-by-round detail from each map’s tracker.gg import.'}
           </p>
         )}
       </div>
@@ -394,6 +476,33 @@ function SubjectField({
         emptyLabel="Anyone"
       />
     </Field>
+  );
+}
+
+/** One side of the XvX filter: a player count 1–5, or X for any. */
+function AliveSelect({
+  value,
+  onChange,
+  label,
+}: {
+  value: AliveOption;
+  onChange: (next: AliveOption) => void;
+  label: string;
+}) {
+  return (
+    <select
+      className="input w-14 text-center"
+      aria-label={label}
+      title={label}
+      value={value}
+      onChange={(e) => onChange(e.target.value as AliveOption)}
+    >
+      {ALIVE_OPTIONS.map((o) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
+    </select>
   );
 }
 
