@@ -3,6 +3,7 @@ export type ChangelogEntry = {
   /** Release date as an ISO `YYYY-MM-DD` string. */
   date: string;
   title: string;
+  /** One line per change. Wrap text in {{double braces}} to show it in gold. */
   changes: string[];
 };
 
@@ -21,6 +22,20 @@ export function formatReleaseDate(iso: string): string {
 
 // Newest first.
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.4.0',
+    date: '2026-11-24',
+    title: 'Scouting rework, VLR rating, ability usage, Hush',
+    changes: [
+      'Scouting reports rebuilt: paste the opponent’s Riot IDs, run the generated script on their tracker.gg pages and upload the files. The report fills in their map record, round and pistol win rates, comps, a player scoreboard, a per-map heatmap and ability usage, plus a Notes section',
+      'Older scouting reports stay as they were',
+      'New VLR rating (an estimate of vlr.gg’s Rating 2.0, {{credit Gabraf}}) next to ACS everywhere ACS shows up: the player stats tables, the Players and Agents tabs, the Maps tab, the stats tabs, and the tracker.gg import preview. Maps imported from tracker.gg get one, including ones imported before this update; maps entered by hand show a dash',
+      'Ability usage: each map on a series page now lists every player’s C / Q / E casts per round and ultimate casts. The Players tab (per agent) and Agents tab show the same as averages, with the ultimate as casts per map. Hover an ability icon for its name and exact counts',
+      'Hush added: she’s in the agent pickers and filters, with her icon and ability icons',
+      'KAY/O now shows as KAY/O with the right icon everywhere, including maps imported from tracker.gg. Maps and scouting reports saved under the old “Kayo” spelling are merged in automatically',
+      'Fixed tracker.gg matches that report 0 ADR for every player. ADR and damage delta are now worked out from the round-by-round damage instead, for new imports and for maps already imported',
+    ],
+  },
   {
     version: '1.3.0',
     date: '2026-10-27',

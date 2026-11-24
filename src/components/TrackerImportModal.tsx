@@ -228,7 +228,12 @@ export default function TrackerImportModal({ players, onImport, onClose }: Props
                           >
                             {p.agent && <AgentIcon agent={p.agent} size={14} />}
                             <span className="truncate">{p.name}</span>
-                            <span className="ml-auto tabular-nums">{p.stat.acs}</span>
+                            <span className="ml-auto tabular-nums" title="VLR rating">
+                              {p.stat.vlrRating != null ? p.stat.vlrRating.toFixed(2) : '—'}
+                            </span>
+                            <span className="w-8 text-right tabular-nums" title="ACS">
+                              {p.stat.acs}
+                            </span>
                           </div>
                         ))}
                       </div>

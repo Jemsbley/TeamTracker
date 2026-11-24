@@ -171,9 +171,23 @@ model ScoutingReport {
   // (just unlinks them) rather than cascading them away.
   rosterId  String?
   // ScoutMap[]: per-map record (wins/losses), record note, up to 3 agent
-  // compositions, and attack/defense notes. Stored as JSON for parity with
-  // the frontend types, like Series.pickBan/videos.
+  // compositions, and attack/defense notes. Only reports made before the
+  // tracker.gg rework use this; newer ones leave it null and set `tags`.
   maps      Json?
+  // string[]: the opponent's Riot IDs (name#tag), 5–10 of them.
+  tags        Json?
+  // Count matches played out to all 24 rounds (likely scrims).
+  includeMR24 Boolean @default(false)
+  // Fewest of `tags` on one team for a match to count (3–5).
+  minPlayers  Int     @default(5)
+  // ISO yyyy-mm-dd: matches before this are ignored. Null = the client's
+  // default (Sep 1 or Jan 1 of the current year, whichever is more recent).
+  since       String?
+  // ScoutMatch[]: uploaded opponent matches, parsed client-side from
+  // tracker.gg responses down to rounds + stat lines. JSON like Game.rounds.
+  matches     Json?
+  // Markdown notes / pasted write-up shown at the bottom of the report.
+  notes       String?
 
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
   roster Roster? @relation(fields: [rosterId], references: [id], onDelete: SetNull)

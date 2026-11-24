@@ -1,5 +1,6 @@
 import { AGENT_CLASS, CLASS_LABEL } from '../constants';
 import type { AgentClass, Game, Player, Side, ValorantMap } from '../types';
+import { canonicalAgent } from './agentName';
 import { sideOfRound } from './rounds';
 
 /** Bomb sites tracker.gg reports. Most maps only use A and B. */
@@ -113,7 +114,7 @@ function statNum(seg: RawSegment, key: string): number {
  * enough rounds were entered. Otherwise fall back to which side's agents the
  * imported stat lines came from.
  */
-function resolveUsTeam(
+export function resolveUsTeam(
   game: Game,
   summaries: Array<{ team: TeamColor; agent: string }>,
   winners: Array<TeamColor | null>
@@ -150,7 +151,7 @@ function resolveUsTeam(
  * stat rows is dropped rather than guessed at (never happens in a real match,
  * but stat lines are hand-editable).
  */
-function playerIdByAgent(game: Game): Map<string, string> {
+export function playerIdByAgent(game: Game): Map<string, string> {
   const seen = new Map<string, string | null>();
   for (const s of game.stats) {
     if (!s.agent || !s.playerId) continue;
@@ -173,7 +174,7 @@ function buildGameDetail(game: Game): GameDetail | null {
     const identifier = str(s.attributes?.platformUserIdentifier);
     const team = teamOf(s.metadata?.teamId);
     if (!identifier || !team) continue;
-    summaries.push({ identifier, team, agent: str(s.metadata?.agentName) });
+    summaries.push({ identifier, team, agent: canonicalAgent(str(s.metadata?.agentName)) });
   }
   if (summaries.length === 0) return null;
 
@@ -263,7 +264,7 @@ function buildGameDetail(game: Game): GameDetail | null {
     rounds[idx].actors.push({
       identifier,
       playerId: playerIdByIdentifier.get(identifier),
-      agent: str(s.metadata?.agentName),
+      agent: canonicalAgent(str(s.metadata?.agentName)),
       kills: statNum(s, 'kills'),
       deaths: statNum(s, 'deaths'),
       assists: statNum(s, 'assists'),

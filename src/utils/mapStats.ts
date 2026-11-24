@@ -90,6 +90,9 @@ export type MapAggregate = {
   /** Sum and count of ACS across player-game stats; computed average available below. */
   acsSum: number;
   acsCount: number;
+  /** Sum and count of VLR ratings, over stat lines that have one. */
+  vlrSum: number;
+  vlrCount: number;
   topComp: AgentComp | null;
 };
 
@@ -124,6 +127,8 @@ export function computeMapAggregates(
       defenseRounds: { wins: 0, total: 0 },
       acsSum: 0,
       acsCount: 0,
+      vlrSum: 0,
+      vlrCount: 0,
       topComp: null,
     };
   }
@@ -209,6 +214,10 @@ export function computeMapAggregates(
     for (const stat of g.stats) {
       agg.acsSum += stat.acs;
       agg.acsCount += 1;
+      if (typeof stat.vlrRating === 'number' && isFinite(stat.vlrRating)) {
+        agg.vlrSum += stat.vlrRating;
+        agg.vlrCount += 1;
+      }
     }
 
     // Agent composition (5 agents per map)

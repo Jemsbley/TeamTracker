@@ -368,19 +368,20 @@ function ScoutingSkeleton() {
   );
 }
 
-/** Scouting report detail: title only, then per-map rows/notes. */
+/** Scouting report detail: title, then the roster form (Riot ID box + options). */
 function ScoutingReportSkeleton() {
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <Bone className="h-3 w-20" />
       <TitleCardSkeleton grow />
-      <div className="card space-y-3">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="flex items-center gap-3">
-            <Bone className="h-10 w-14 rounded" />
-            <Bone className="h-3 flex-1" />
-            <Bone className="h-3 w-20" />
-          </div>
-        ))}
+      <div className="card space-y-4">
+        <Bone className="h-3 w-32" />
+        <Bone className="h-44 w-full rounded-md" />
+        <div className="flex items-center gap-8">
+          <Bone className="h-4 w-28" />
+          <Bone className="h-8 w-56 rounded-md" />
+        </div>
+        <Bone className="h-9 w-36 rounded-md" />
       </div>
     </div>
   );

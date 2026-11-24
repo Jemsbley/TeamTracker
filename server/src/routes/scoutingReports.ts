@@ -6,9 +6,9 @@ import { requireRosterAccess, memberRosterIds } from '../access.js';
 
 export const scoutingReportsRouter = Router();
 
-// The per-map data (records, compositions, notes) is deeply nested and already
-// shape-enforced by the frontend's TypeScript types, so we accept `maps` as
-// opaque JSON — the read path hands it back unchanged.
+// Uploaded matches are deeply nested and already shape-enforced by the
+// frontend's TypeScript types (ScoutMatch), so `matches` is accepted as opaque
+// JSON — the read path hands it back unchanged.
 const reportBody = z.object({
   teamName: z.string().min(1).max(200),
   note: z.string().max(2000).optional(),
@@ -16,7 +16,17 @@ const reportBody = z.object({
   createdAt: z.string().max(40).optional(),
   // Optional owning roster. Nullable so the client can explicitly unlink.
   rosterId: z.string().max(64).nullable().optional(),
+  // Original-format reports only: per-map records/comps/notes, opaque JSON.
   maps: z.any().optional(),
+  tags: z.array(z.string().min(1).max(100)).max(10).optional(),
+  includeMR24: z.boolean().optional(),
+  minPlayers: z.number().int().min(3).max(5).optional(),
+  // ISO yyyy-mm-dd cutoff; null resets to the client's default.
+  since: z.string().max(40).nullable().optional(),
+  matches: z.any().optional(),
+  // Markdown notes / pasted write-up. Generous cap: a long AI-written report
+  // is ~50 KB.
+  notes: z.string().max(200_000).nullable().optional(),
 });
 
 const reportCreate = reportBody.extend({ id: z.string().min(1).max(64).optional() });

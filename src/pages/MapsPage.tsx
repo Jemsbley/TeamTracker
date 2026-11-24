@@ -38,6 +38,7 @@ type SortKey =
   | 'atkRound'
   | 'defRound'
   | 'topComp'
+  | 'avgVlr'
   | 'avgAcs';
 type SortDir = 'asc' | 'desc';
 
@@ -53,6 +54,7 @@ const SORT_KEYS: SortKey[] = [
   'atkRound',
   'defRound',
   'topComp',
+  'avgVlr',
   'avgAcs',
 ];
 
@@ -89,6 +91,8 @@ function getSortValue(
       return rate(m.defenseRounds.wins, m.defenseRounds.total);
     case 'topComp':
       return m.topComp ? m.topComp.wins / m.topComp.total : undefined;
+    case 'avgVlr':
+      return m.vlrCount > 0 ? m.vlrSum / m.vlrCount : undefined;
     case 'avgAcs':
       return m.acsCount > 0 ? m.acsSum / m.acsCount : undefined;
   }
@@ -312,7 +316,7 @@ export default function MapsPage() {
         </div>
       ) : (
         <div className="card overflow-x-auto p-0">
-          <table className="w-full min-w-[1100px]">
+          <table className="w-full min-w-[1200px]">
             <thead className="bg-valorant-panel2/40">
               <tr>
                 <SortHeader
@@ -390,6 +394,13 @@ export default function MapsPage() {
                   label="Top Comp"
                   k="topComp"
                   align="left"
+                  active={sortKey}
+                  dir={sortDir}
+                  onClick={handleSort}
+                />
+                <SortHeader
+                  label="Avg VLR"
+                  k="avgVlr"
                   active={sortKey}
                   dir={sortDir}
                   onClick={handleSort}
@@ -479,6 +490,7 @@ function MapRow({
   onClick: () => void;
 }) {
   const avgAcs = m.acsCount > 0 ? m.acsSum / m.acsCount : 0;
+  const avgVlr = m.vlrCount > 0 ? m.vlrSum / m.vlrCount : undefined;
   const dim = m.plays === 0 ? 'text-valorant-muted' : '';
   return (
     <tr
@@ -548,6 +560,9 @@ function MapRow({
         ) : (
           <span className="text-valorant-muted text-xs">—</span>
         )}
+      </td>
+      <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
+        {avgVlr !== undefined ? avgVlr.toFixed(2) : '—'}
       </td>
       <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
         {avgAcs > 0 ? avgAcs.toFixed(0) : '—'}

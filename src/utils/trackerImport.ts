@@ -1,6 +1,8 @@
 import { MAPS } from '../constants';
 import type { GameStat, Round, RoundCategoryUser, Side, ValorantMap } from '../types';
+import { canonicalAgent } from './agentName';
 import { halfInfo } from './rounds';
+import { deriveTrackerPlayers } from './trackerDerived';
 
 type TeamColor = 'Red' | 'Blue';
 
@@ -70,6 +72,11 @@ export function parseTrackerMatchJson(raw: string): TrackerImportResult {
   } catch {
     throw new Error('That doesn’t look like valid JSON. Paste the full response body.');
   }
+  return parseTrackerMatch(root);
+}
+
+/** Parses an already-decoded tracker.gg match API response. */
+export function parseTrackerMatch(root: unknown): TrackerImportResult {
   const data = (root as { data?: unknown })?.data as
     | { metadata?: Record<string, unknown>; segments?: TrackerSegment[] }
     | undefined;
@@ -207,11 +214,18 @@ export function parseTrackerMatchJson(raw: string): TrackerImportResult {
     };
   });
 
+  // VLR rating, ability casts, and ADR / damage delta rebuilt from the round
+  // damage feed when tracker's summary reports 0 damage (a tracker.gg bug).
+  const derivedByIdentifier = deriveTrackerPlayers(root);
+
   const players: TrackerImportedPlayer[] = playerSummaries.map((seg) => {
     const identifier = seg.attributes.platformUserIdentifier as string;
+    const derived = derivedByIdentifier?.get(identifier);
+    const damageBugged = derived?.damageBugged ?? false;
     const name = identifier?.split('#')[0] ?? identifier ?? 'Unknown';
     const team = (seg.metadata.teamId as TeamColor) === 'Blue' ? 'Blue' : 'Red';
-    const agent = typeof seg.metadata.agentName === 'string' ? seg.metadata.agentName : '';
+    // tracker spells some agents differently ("KAY/O"); store the app's name.
+    const agent = canonicalAgent(typeof seg.metadata.agentName === 'string' ? seg.metadata.agentName : '');
     // tracker buckets a player's rounds by exact kill count, so `doubleKills`
     // means "rounds with exactly 2 kills" — a 2k isn't a multikill. Only 3k+
     // rounds count, which is what tracker's own `multiKills` reports; sum the
@@ -226,12 +240,14 @@ export function parseTrackerMatchJson(raw: string): TrackerImportResult {
       kills: num(seg, 'kills'),
       deaths: num(seg, 'deaths'),
       assists: num(seg, 'assists'),
-      damageDelta: Math.round(num(seg, 'damageDeltaPerRound')),
-      adr: Math.round(num(seg, 'damagePerRound')),
+      damageDelta: damageBugged ? derived!.damageDelta : Math.round(num(seg, 'damageDeltaPerRound')),
+      adr: damageBugged ? derived!.adr : Math.round(num(seg, 'damagePerRound')),
       kastPercent: round1(num(seg, 'kast')),
       firstKills: num(seg, 'firstKills'),
       firstDeaths: num(seg, 'firstDeaths'),
       multikills,
+      ...(derived?.vlrRating != null ? { vlrRating: derived.vlrRating } : {}),
+      ...(derived?.abilities ? { abilities: derived.abilities } : {}),
     };
     return { identifier, name, team, agent, stat };
   });

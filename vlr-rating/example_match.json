@@ -1,0 +1,239 @@
+{
+ "players": [
+  {
+   "id": "a1",
+   "team": "A",
+   "rounds": 3,
+   "kills": 3,
+   "assists": 1,
+   "damage": 520
+  },
+  {
+   "id": "a2",
+   "team": "A",
+   "rounds": 3,
+   "kills": 3,
+   "assists": 2,
+   "damage": 410
+  },
+  {
+   "id": "a3",
+   "team": "A",
+   "rounds": 3,
+   "kills": 1,
+   "assists": 0,
+   "damage": 260
+  },
+  {
+   "id": "a4",
+   "team": "A",
+   "rounds": 3,
+   "kills": 4,
+   "assists": 1,
+   "damage": 470
+  },
+  {
+   "id": "a5",
+   "team": "A",
+   "rounds": 3,
+   "kills": 0,
+   "assists": 3,
+   "damage": 90
+  },
+  {
+   "id": "b1",
+   "team": "B",
+   "rounds": 3,
+   "kills": 1,
+   "assists": 1,
+   "damage": 300
+  },
+  {
+   "id": "b2",
+   "team": "B",
+   "rounds": 3,
+   "kills": 3,
+   "assists": 0,
+   "damage": 380
+  },
+  {
+   "id": "b3",
+   "team": "B",
+   "rounds": 3,
+   "kills": 1,
+   "assists": 2,
+   "damage": 240
+  },
+  {
+   "id": "b4",
+   "team": "B",
+   "rounds": 3,
+   "kills": 1,
+   "assists": 1,
+   "damage": 210
+  },
+  {
+   "id": "b5",
+   "team": "B",
+   "rounds": 3,
+   "kills": 1,
+   "assists": 0,
+   "damage": 150
+  }
+ ],
+ "rounds": [
+  {
+   "number": 1,
+   "loadout": {
+    "A": 4000,
+    "B": 3900
+   },
+   "kills": [
+    {
+     "t_ms": 10000,
+     "killer": "a1",
+     "victim": "b1",
+     "spike": false
+    },
+    {
+     "t_ms": 11500,
+     "killer": "b2",
+     "victim": "a1",
+     "spike": false
+    },
+    {
+     "t_ms": 20000,
+     "killer": "a2",
+     "victim": "b2",
+     "spike": false
+    },
+    {
+     "t_ms": 30000,
+     "killer": "a3",
+     "victim": "b3",
+     "spike": false
+    },
+    {
+     "t_ms": 52000,
+     "killer": "b4",
+     "victim": "a3",
+     "spike": false
+    },
+    {
+     "t_ms": 60000,
+     "killer": "a4",
+     "victim": "b4",
+     "spike": false
+    },
+    {
+     "t_ms": 61000,
+     "killer": "a2",
+     "victim": "b5",
+     "spike": false
+    }
+   ]
+  },
+  {
+   "number": 2,
+   "loadout": {
+    "A": 3000,
+    "B": 20000
+   },
+   "kills": [
+    {
+     "t_ms": 5000,
+     "killer": "b1",
+     "victim": "a1",
+     "spike": false
+    },
+    {
+     "t_ms": 6000,
+     "killer": "a2",
+     "victim": "b1",
+     "spike": false
+    },
+    {
+     "t_ms": 7000,
+     "killer": "a3",
+     "victim": "a4",
+     "spike": false
+    },
+    {
+     "t_ms": 8000,
+     "killer": "a2",
+     "victim": "a2",
+     "spike": false
+    },
+    {
+     "t_ms": 20000,
+     "killer": "b2",
+     "victim": "a3",
+     "spike": false
+    },
+    {
+     "t_ms": 95000,
+     "killer": "a5",
+     "victim": "a5",
+     "spike": true
+    }
+   ]
+  },
+  {
+   "number": 3,
+   "loadout": {
+    "A": 21000,
+    "B": 20500
+   },
+   "kills": [
+    {
+     "t_ms": 15000,
+     "killer": "b5",
+     "victim": "a5",
+     "spike": false
+    },
+    {
+     "t_ms": 16000,
+     "killer": "a1",
+     "victim": "b5",
+     "spike": false
+    },
+    {
+     "t_ms": 40000,
+     "killer": "a1",
+     "victim": "b4",
+     "spike": false
+    },
+    {
+     "t_ms": 41000,
+     "killer": "b3",
+     "victim": "a1",
+     "spike": false
+    },
+    {
+     "t_ms": 42500,
+     "killer": "a4",
+     "victim": "b3",
+     "spike": false
+    },
+    {
+     "t_ms": 70000,
+     "killer": "b2",
+     "victim": "a2",
+     "spike": false
+    },
+    {
+     "t_ms": 72000,
+     "killer": "a4",
+     "victim": "b2",
+     "spike": false
+    },
+    {
+     "t_ms": 80000,
+     "killer": "a4",
+     "victim": "b1",
+     "spike": false
+    }
+   ]
+  }
+ ]
+}

@@ -6,6 +6,7 @@ import {
   parseAsStringEnum,
   useQueryState,
 } from 'nuqs';
+import AbilityUsageStrip from '../components/AbilityUsageStrip';
 import AgentIcon from '../components/AgentIcon';
 import DateRangePicker from '../components/DateRangePicker';
 import GettingStarted from '../components/GettingStarted';
@@ -527,6 +528,7 @@ function AgentDetailRow({ a }: { a: AgentStat }) {
           </div>
           <div className="text-xs text-valorant-muted">
             {a.selections} {a.selections === 1 ? 'sel.' : 'sel.'} ·{' '}
+            {isFinite(a.avgVlr) && <>{a.avgVlr.toFixed(2)} VLR · </>}
             {a.avgAcs.toFixed(0)} ACS
             {a.selections > 0 && (
               <>
@@ -554,6 +556,9 @@ function AgentDetailRow({ a }: { a: AgentStat }) {
                 {a.bestPlayer.name}
               </div>
               <div className="text-valorant-muted text-sm whitespace-nowrap">
+                {isFinite(a.bestPlayer.avgVlr) && (
+                  <>{a.bestPlayer.avgVlr.toFixed(2)} avg VLR · </>
+                )}
                 {a.bestPlayer.avgAcs.toFixed(0)} avg ACS ({a.bestPlayer.games}{' '}
                 {a.bestPlayer.games === 1 ? 'game' : 'games'})
               </div>
@@ -590,6 +595,19 @@ function AgentDetailRow({ a }: { a: AgentStat }) {
           </div>
         )}
       </div>
+      {a.abilities && (
+        <div className="pt-2 border-t border-white/5">
+          <div className="text-sm font-semibold uppercase tracking-wide text-valorant-muted">
+            Avg ability usage{' '}
+            <span className="normal-case font-normal text-xs">
+              (per round · ult per map)
+            </span>
+          </div>
+          <div className="mt-1 text-sm">
+            <AbilityUsageStrip agent={a.agent} usage={a.abilities} size={24} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

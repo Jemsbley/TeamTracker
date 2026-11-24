@@ -1,3 +1,5 @@
+import type { HeatmapEvent, MapDetails } from './utils/heatmapData';
+
 export type AgentClass = 'controller' | 'duelist' | 'initiator' | 'sentinel';
 
 export type ValorantMap =
@@ -141,6 +143,24 @@ export type GameStat = {
   firstKills: number;
   firstDeaths: number;
   multikills: number;
+  /**
+   * VLR Rating 2.0 estimate for this map. Derived from the game's tracker.gg
+   * rawJson when games load (see utils/trackerDerived.ts) — never stored, so
+   * games without a tracker import have none.
+   */
+  vlrRating?: number;
+  /** Ability casts on this map. Derived from rawJson like vlrRating; never stored. */
+  abilities?: AbilityCasts;
+};
+
+/** Total casts per ability slot on one map (C/Q/E/X keybinds), plus the
+ * rounds the player played so they can be put per round. */
+export type AbilityCasts = {
+  c: number;
+  q: number;
+  e: number;
+  x: number;
+  rounds: number;
 };
 
 export type Game = {
@@ -163,7 +183,8 @@ export type Game = {
 /** A single agent composition: up to 5 agent names (slots may be ''). */
 export type ScoutComp = string[];
 
-/** A scouted opponent's profile for one map. */
+/** A scouted opponent's profile for one map — the original, hand-entered
+ * scouting format. Only reports made before the tracker.gg rework have these. */
 export type ScoutMap = {
   map: ValorantMap;
   /** Opponent's wins/losses on this map, as recorded by the user. */
@@ -179,6 +200,40 @@ export type ScoutMap = {
   defenseNotes?: string;
 };
 
+/**
+ * One opponent match, parsed from a tracker.gg match response when the user
+ * uploads it to a scouting report. Shaped like a Game from the scouted team's
+ * point of view, so the same stat and round helpers work on it. The raw
+ * tracker JSON (~1 MB per match) is not kept.
+ */
+export type ScoutMatch = {
+  /** tracker.gg match id — used to skip duplicates across uploaded files. */
+  id: string;
+  map: ValorantMap;
+  date: string; // ISO yyyy-mm-dd
+  startingSide?: Side;
+  /** Every round, from the scouted team's side. */
+  rounds: Round[];
+  /**
+   * The scouted team's five stat lines. `playerId` is the lowercased Riot ID.
+   * Unlike Game stats, vlrRating and abilities are stored here, since there is
+   * no rawJson to derive them from later.
+   */
+  stats: GameStat[];
+  /** Riot ID as tracker.gg displays it, keyed by playerId. */
+  names: Record<string, string>;
+  /** Kills by and deaths of the scouted team, for the per-map heatmap.
+   * Missing on matches uploaded before scouting heatmaps existed. */
+  heatmap?: {
+    mapDetails: MapDetails;
+    events: ScoutHeatEvent[];
+  };
+};
+
+/** A heatmap point as stored on a ScoutMatch: the gameId is the match's own
+ * id and the team is always the scouted one, so neither is repeated. */
+export type ScoutHeatEvent = Omit<HeatmapEvent, 'gameId' | 'team'>;
+
 export type ScoutingReport = {
   id: string;
   /** Opponent team name (required). */
@@ -190,8 +245,25 @@ export type ScoutingReport = {
   createdAt?: string;
   /** Optional owning roster; null/undefined means unassigned. */
   rosterId?: string | null;
-  /** One entry per map in the game; ordered by record once edited. */
-  maps: ScoutMap[];
+  /**
+   * Original-format reports only: hand-entered per-map records, comps and
+   * notes. A report without `tags` is in that format (see isLegacyReport).
+   */
+  maps?: ScoutMap[] | null;
+  /** The opponent's Riot IDs (name#tag), 5–10 of them. Always set (possibly
+   * empty) on reports created since the tracker.gg rework. */
+  tags?: string[] | null;
+  /** Count matches played out to all 24 rounds (likely scrims). */
+  includeMR24?: boolean;
+  /** Fewest of `tags` on one team for a match to count (3–5). */
+  minPlayers?: number;
+  /** ISO yyyy-mm-dd: ignore matches before this. Unset = defaultScoutSince(). */
+  since?: string | null;
+  /** Uploaded opponent matches, deduplicated by tracker match id. */
+  matches?: ScoutMatch[] | null;
+  /** Free-form markdown at the bottom of the report: the user's own notes or
+   * a pasted write-up. */
+  notes?: string | null;
 };
 
 export type AppState = {

@@ -7,3 +7,5 @@ dist
 .env
 .env.local
 DEPLOYMENT.md
+aiscout/
+mobile-samples/

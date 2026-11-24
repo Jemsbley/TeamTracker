@@ -1,5 +1,7 @@
 import type { Game, GameStat, ValorantMap } from '../types';
+import { aggregateAbilities, type AbilityUsage } from './abilities';
 import { effectiveClutchWon, roundsPlayedIn } from './rounds';
+import { avgVlr } from './stats';
 
 type Entry = {
   stat: GameStat;
@@ -9,8 +11,12 @@ type Entry = {
   clutchesWon: number;
 };
 
+type BestMap = { map: ValorantMap; avgAcs: number; avgVlr: number; games: number };
+
 export type PlayerAggregate = {
   selections: number;
+  /** Avg VLR rating over games that have one; NaN if none do. */
+  vlrRating: number;
   acs: number;
   hsPercent: number;
   kdr: number;
@@ -27,7 +33,9 @@ export type PlayerAggregate = {
   firstDeathPercent: number;
   /** % of this player's marked clutch attempts that were won: won / (won + lost). */
   clutchPercent: number;
-  bestMap: { map: ValorantMap; avgAcs: number; games: number } | null;
+  bestMap: BestMap | null;
+  /** Ability usage across these games; null if none recorded casts. */
+  abilities: AbilityUsage | null;
 };
 
 export type PlayerAgentRow = PlayerAggregate & { agent: string };
@@ -39,6 +47,7 @@ export type PlayerStats = {
 
 const ZERO: PlayerAggregate = {
   selections: 0,
+  vlrRating: NaN,
   acs: 0,
   hsPercent: 0,
   kdr: 0,
@@ -53,6 +62,7 @@ const ZERO: PlayerAggregate = {
   firstDeathPercent: 0,
   clutchPercent: 0,
   bestMap: null,
+  abilities: null,
 };
 
 function aggregate(entries: Entry[]): PlayerAggregate {
@@ -71,6 +81,7 @@ function aggregate(entries: Entry[]): PlayerAggregate {
   const totalClutchesWon = entries.reduce((a, e) => a + e.clutchesWon, 0);
   return {
     selections: n,
+    vlrRating: avgVlr(entries.map((e) => e.stat)),
     acs: sum('acs') / n,
     hsPercent: sum('hsPercent') / n,
     kdr: totalDeaths === 0 ? totalKills : totalKills / totalDeaths,
@@ -85,24 +96,24 @@ function aggregate(entries: Entry[]): PlayerAggregate {
     firstDeathPercent: totalRoundsPlayed ? (sum('firstDeaths') / totalRoundsPlayed) * 100 : 0,
     clutchPercent: totalClutches ? (totalClutchesWon / totalClutches) * 100 : 0,
     bestMap: bestMapFor(entries),
+    abilities: aggregateAbilities(entries.map((e) => e.stat.abilities)),
   };
 }
 
-function bestMapFor(
-  entries: Entry[]
-): { map: ValorantMap; avgAcs: number; games: number } | null {
-  const byMap = new Map<ValorantMap, { sum: number; count: number }>();
+function bestMapFor(entries: Entry[]): BestMap | null {
+  const byMap = new Map<ValorantMap, GameStat[]>();
   for (const e of entries) {
-    const cur = byMap.get(e.map) ?? { sum: 0, count: 0 };
-    cur.sum += e.stat.acs;
-    cur.count += 1;
-    byMap.set(e.map, cur);
+    const list = byMap.get(e.map) ?? [];
+    list.push(e.stat);
+    byMap.set(e.map, list);
   }
-  let best: { map: ValorantMap; avgAcs: number; games: number } | null = null;
-  for (const [map, { sum, count }] of byMap) {
-    if (count === 0) continue;
-    const avg = sum / count;
-    if (!best || avg > best.avgAcs) best = { map, avgAcs: avg, games: count };
+  let best: BestMap | null = null;
+  for (const [map, list] of byMap) {
+    if (list.length === 0) continue;
+    const avg = list.reduce((a, s) => a + s.acs, 0) / list.length;
+    if (!best || avg > best.avgAcs) {
+      best = { map, avgAcs: avg, avgVlr: avgVlr(list), games: list.length };
+    }
   }
   return best;
 }

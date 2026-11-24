@@ -68,7 +68,13 @@ for i in $(seq 1 30); do
 done
 
 echo "→ Syncing database schema (prisma db push)…"
-(cd server && npx --no-install prisma db push --skip-generate) >/dev/null
+# Quiet on success, but show Prisma's output on failure — otherwise set -e
+# exits here silently (e.g. when a schema change would drop data).
+if ! PUSH_OUTPUT=$(cd server && npx --no-install prisma db push --skip-generate 2>&1); then
+  echo "$PUSH_OUTPUT" >&2
+  echo "✗ Schema sync failed (see above)." >&2
+  exit 1
+fi
 
 # ----- Run ---------------------------------------------------------------
 

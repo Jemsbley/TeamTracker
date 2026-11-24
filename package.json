@@ -1,7 +1,7 @@
 {
   "name": "team-tracker",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.4.0",
   "type": "module",
   "scripts": {
     "start": "bash scripts/dev.sh",
@@ -16,7 +16,9 @@
     "nuqs": "^2.8.9",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-markdown": "^9.1.0",
     "react-router-dom": "^6.26.2",
+    "remark-gfm": "^4.0.1",
     "zustand": "^4.5.5"
   },
   "devDependencies": {

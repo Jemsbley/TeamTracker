@@ -381,8 +381,12 @@ function HoverTooltip({
           <>
             <dt className="text-valorant-muted">Date</dt>
             <dd className="text-white">{formatGameDate(game.date)}</dd>
-            <dt className="text-valorant-muted">Series</dt>
-            <dd className="text-white truncate">{game.series}</dd>
+            {game.series && (
+              <>
+                <dt className="text-valorant-muted">Series</dt>
+                <dd className="text-white truncate">{game.series}</dd>
+              </>
+            )}
           </>
         )}
         <dt className="text-valorant-muted">Side</dt>

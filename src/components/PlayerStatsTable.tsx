@@ -26,6 +26,7 @@ type Col = {
 
 const COLUMNS: Col[] = [
   { key: 'name', label: 'Player', align: 'left' },
+  { key: 'vlrRating', label: 'VLR', digits: 2 },
   { key: 'acs', label: 'ACS', digits: 0 },
   { key: 'kdr', label: 'KDR', digits: 2 },
   { key: 'assists', label: 'A', digits: 1 },
