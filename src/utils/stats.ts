@@ -20,6 +20,8 @@ export type StatFilters = {
 
 export type Aggregate = {
   games: number;
+  /** Avg VLR rating over games that have one (tracker imports); NaN if none do. */
+  vlrRating: number;
   acs: number;
   hsPercent: number;
   kdr: number;
@@ -36,6 +38,7 @@ export type Aggregate = {
 
 export const ZERO_AGG: Aggregate = {
   games: 0,
+  vlrRating: NaN,
   acs: 0,
   hsPercent: 0,
   kdr: 0,
@@ -92,12 +95,22 @@ function avg(arr: number[]): number {
   return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
+/** Average of the stat lines that have a VLR rating; NaN when none do (games
+ * entered by hand), so it renders as a dash instead of dragging the mean down. */
+export function avgVlr(stats: GameStat[]): number {
+  const vals = stats
+    .map((s) => s.vlrRating)
+    .filter((v): v is number => typeof v === 'number' && isFinite(v));
+  return vals.length ? avg(vals) : NaN;
+}
+
 export function aggregate(stats: GameStat[]): Aggregate {
   if (!stats.length) return { ...ZERO_AGG };
   const totalKills = stats.reduce((a, s) => a + s.kills, 0);
   const totalDeaths = stats.reduce((a, s) => a + s.deaths, 0);
   return {
     games: stats.length,
+    vlrRating: avgVlr(stats),
     acs: avg(stats.map((s) => s.acs)),
     hsPercent: avg(stats.map((s) => s.hsPercent)),
     kdr: totalDeaths === 0 ? totalKills : totalKills / totalDeaths,
@@ -156,6 +169,7 @@ export type StatDef = {
 };
 
 export const STAT_DEFS: StatDef[] = [
+  { key: 'vlrRating', label: 'VLR', format: (v) => fmt(v, 2), isPercent: false },
   { key: 'acs', label: 'ACS', format: (v) => fmt(v, 0), isPercent: false },
   { key: 'kdr', label: 'KDR', format: (v) => fmt(v, 2), isPercent: false },
   { key: 'assists', label: 'A', format: (v) => fmt(v, 1), isPercent: false },
@@ -233,12 +247,16 @@ export function rankItemsByStats<T>(
 
   for (const def of STAT_DEFS) {
     // For ranking purposes, "best" = highest value; flip for lower-is-better.
-    const valued = scored.map((s) => ({
-      item: s.item,
-      v: (s.agg[def.key] as number) * (def.lowerIsBetter ? -1 : 1),
-    }));
+    // Missing values (e.g. no VLR rating on hand-entered games) rank last.
+    const valued = scored.map((s) => {
+      const raw = s.agg[def.key] as number;
+      return {
+        item: s.item,
+        v: isFinite(raw) ? raw * (def.lowerIsBetter ? -1 : 1) : -Infinity,
+      };
+    });
     // Sort descending: highest "good" value first.
-    valued.sort((a, b) => b.v - a.v);
+    valued.sort((a, b) => (a.v === b.v ? 0 : b.v > a.v ? 1 : -1));
     valued.forEach((entry, idx) => {
       ranksByItem.get(entry.item)!.push(idx + 1);
     });

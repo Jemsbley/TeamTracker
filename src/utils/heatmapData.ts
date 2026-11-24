@@ -1,3 +1,5 @@
+import { canonicalAgent } from './agentName';
+
 export type Team = 'Blue' | 'Red';
 export type Side = 'attacker' | 'defender';
 export type EventKind = 'kill' | 'death';
@@ -128,7 +130,7 @@ export function buildHeatmapMatchFromRawExport(
     if (s.type !== 'player-summary') continue;
     const id = s.attributes.platformUserIdentifier as string;
     const meta = s.metadata as { teamId: Team; agentName: string };
-    roster.set(id, { alias: id, id, team: meta.teamId, agent: meta.agentName });
+    roster.set(id, { alias: id, id, team: meta.teamId, agent: canonicalAgent(meta.agentName ?? '') });
   }
 
   const sideByRoundPlayer = new Map<string, Side>();

@@ -3,7 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { parseAsStringEnum, useQueryState } from 'nuqs';
 import { sortSeriesGames, useStore, canEditSeries } from '../store';
 import WriteButton, { WRITE_TOOLTIP } from '../components/WriteButton';
+import AbilityUsageStrip from '../components/AbilityUsageStrip';
 import AgentBadge from '../components/AgentBadge';
+import AgentIcon from '../components/AgentIcon';
 import MapIcon from '../components/MapIcon';
 import PickBanCard from '../components/PickBanCard';
 import PlayerStatsTable from '../components/PlayerStatsTable';
@@ -19,6 +21,7 @@ import {
   type RoundEconomy,
 } from '../utils/rounds';
 import { gameMvpPlayerId, seriesMvpPlayerId } from '../utils/mvp';
+import { aggregateAbilities } from '../utils/abilities';
 import { FORMAT_TO_WIN, SERIES_FORMATS, type SeriesFormat } from '../types';
 import { seriesStatus } from '../utils/series';
 import { playedMaps, type PlayedMapSummary } from '../utils/pickBan';
@@ -451,6 +454,10 @@ function GameSlot({
 }) {
   const economy = gameEconomy(game);
   const mvpId = gameMvpPlayerId(game);
+  const abilityRows = game.stats.flatMap((s) => {
+    const usage = aggregateAbilities([s.abilities]);
+    return usage ? [{ stat: s, usage }] : [];
+  });
   const score = deriveScore(game);
   const finalScore =
     score ??
@@ -542,6 +549,25 @@ function GameSlot({
       {economy.total > 0 && (
         <div className="border-t border-white/5 px-4 py-3 bg-valorant-panel2/20">
           <RoundEconomyPanel economy={economy} compact compare={compareEconomy} />
+        </div>
+      )}
+      {abilityRows.length > 0 && (
+        <div className="border-t border-white/5 px-4 py-3 bg-valorant-panel2/20 space-y-2">
+          <div className="text-xs uppercase tracking-wider text-valorant-muted">
+            Abilities{' '}
+            <span className="normal-case">(casts per round · ult casts this map)</span>
+          </div>
+          <div className="grid gap-x-8 gap-y-1.5 md:grid-cols-2 xl:grid-cols-3">
+            {abilityRows.map(({ stat, usage }) => (
+              <div key={stat.playerId + stat.agent} className="flex items-center gap-2 text-sm min-w-0">
+                <AgentIcon agent={stat.agent} size={20} />
+                <span className="w-24 truncate text-valorant-muted">
+                  {players.find((p) => p.id === stat.playerId)?.name ?? '?'}
+                </span>
+                <AbilityUsageStrip agent={stat.agent} usage={usage} single />
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -2,6 +2,19 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { CHANGELOG, formatReleaseDate } from '../utils/changelog';
 
+/** Renders a changelog line, showing any {{double-braced}} text in gold. */
+function renderChange(change: string) {
+  return change.split(/\{\{(.+?)\}\}/).map((part, i) =>
+    i % 2 === 1 ? (
+      <span key={i} className="text-yellow-300">
+        {part}
+      </span>
+    ) : (
+      part
+    )
+  );
+}
+
 type Props = {
   onClose: () => void;
 };
@@ -44,7 +57,7 @@ export default function ChangelogModal({ onClose }: Props) {
               {entry.changes.length > 0 && (
                 <ul className="list-disc list-inside space-y-0.5 text-sm text-valorant-muted">
                   {entry.changes.map((change) => (
-                    <li key={change}>{change}</li>
+                    <li key={change}>{renderChange(change)}</li>
                   ))}
                 </ul>
               )}

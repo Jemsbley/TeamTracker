@@ -10,6 +10,8 @@ import type {
 } from './types';
 import * as endpoints from './api/endpoints';
 import { buildGuestSampleState } from './utils/guestSample';
+import { reportWithCanonicalAgents, withCanonicalAgents } from './utils/agentName';
+import { withTrackerDerived } from './utils/trackerDerived';
 import { uid } from './utils/uid';
 
 export function sortSeriesGames(games: Game[]): Game[] {
@@ -100,6 +102,23 @@ type StoreActions = {
 
 export type Store = AppState & StoreActions;
 
+/** A game as the app reads it: agents under their canonical names (older
+ * data may say "Kayo" for KAY/O), and stat lines filled in from the tracker
+ * response (VLR rating, ability casts, repaired ADR). */
+function normalizeGame(game: Game): Game {
+  return withTrackerDerived(withCanonicalAgents(game));
+}
+
+/** Applied wherever state enters the store, so it covers data stored before
+ * those fields were parsed or names changed. */
+function withDerived(state: AppState): AppState {
+  return {
+    ...state,
+    games: state.games.map(normalizeGame),
+    scoutingReports: state.scoutingReports.map(reportWithCanonicalAgents),
+  };
+}
+
 const empty: AppState = {
   rosters: [],
   players: [],
@@ -134,19 +153,19 @@ export const useStore = create<Store>()((set, get) => ({
   guestMode: false,
 
   loadFromServer: async () => {
-    const state = await endpoints.me.state();
+    const state = withDerived(await endpoints.me.state());
     set({ ...state, hydrated: true, syncError: null, adminViewing: null, guestMode: false });
   },
   loadUserStateAsAdmin: async (userId, label) => {
-    const { state } = await endpoints.admin.userState(userId);
+    const state = withDerived((await endpoints.admin.userState(userId)).state);
     set({ ...state, hydrated: true, syncError: null, adminViewing: { userId, label } });
   },
   exitAdminView: async () => {
-    const state = await endpoints.me.state();
+    const state = withDerived(await endpoints.me.state());
     set({ ...state, hydrated: true, syncError: null, adminViewing: null });
   },
   loadGuestSample: () => {
-    const state = buildGuestSampleState();
+    const state = withDerived(buildGuestSampleState());
     set({ ...state, hydrated: true, syncError: null, adminViewing: null, guestMode: true });
   },
   clearLocal: () =>
@@ -304,11 +323,11 @@ export const useStore = create<Store>()((set, get) => ({
       const seriesGames = s.games.filter((g) => g.seriesId === gIn.seriesId);
       const sorted = sortSeriesGames(seriesGames);
       const idToOrder = new Map(sorted.map((g, i) => [g.id, i + 1]));
-      const newGame: Game = {
+      const newGame: Game = normalizeGame({
         id: uid(),
         ...gIn,
         order: sorted.length + 1,
-      };
+      });
       added = newGame;
       const normalized = s.games.map((g) =>
         idToOrder.has(g.id) ? { ...g, order: idToOrder.get(g.id)! } : g
@@ -325,7 +344,7 @@ export const useStore = create<Store>()((set, get) => ({
     if (get().guestMode) return;
     const before = get().games.find((g) => g.id === id);
     set((s) => ({
-      games: s.games.map((g) => (g.id === id ? { ...g, ...patch } : g)),
+      games: s.games.map((g) => (g.id === id ? normalizeGame({ ...g, ...patch }) : g)),
     }));
     runSync(endpoints.games.update(id, patch), () => {
       if (before) {
@@ -479,7 +498,7 @@ export const useStore = create<Store>()((set, get) => ({
    * mockSeed/import flows.
    */
   resetAll: () => set(() => ({ ...empty, hydrated: true })),
-  importState: (next) => set(() => ({ ...empty, ...next, hydrated: true })),
+  importState: (next) => set(() => ({ ...empty, ...withDerived({ ...empty, ...next }), hydrated: true })),
 }));
 
 /** Minimal slice the permission selectors need; full Store satisfies it. */

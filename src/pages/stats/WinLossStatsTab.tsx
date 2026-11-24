@@ -458,6 +458,7 @@ function RankedSeries({
 function averageAggregates(aggs: Aggregate[]): Aggregate {
   const out: Aggregate = {
     games: 0,
+    vlrRating: 0,
     acs: 0,
     hsPercent: 0,
     kdr: 0,
@@ -478,10 +479,12 @@ function averageAggregates(aggs: Aggregate[]): Aggregate {
     let n = 0;
     for (const a of aggs) {
       if (a.games === 0) continue;
-      sum += a[k] as number;
+      const v = a[k] as number;
+      if (!isFinite(v)) continue; // e.g. no VLR rating on a hand-entered map
+      sum += v;
       n += 1;
     }
-    out[k] = (n > 0 ? sum / n : 0) as Aggregate[typeof k];
+    out[k] = (n > 0 ? sum / n : k === 'vlrRating' ? NaN : 0) as Aggregate[typeof k];
   }
   out.games = aggs.reduce((acc, a) => acc + a.games, 0);
   return out;

@@ -102,6 +102,7 @@ type MetricDef = {
 const EPS = 1e-6;
 
 const STEP_FOR_STAT: Record<string, number> = {
+  vlrRating: 0.01,
   acs: 1,
   kdr: 0.01,
   assists: 0.1,

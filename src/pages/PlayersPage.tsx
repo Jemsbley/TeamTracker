@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { parseAsString, parseAsStringEnum, useQueryState } from 'nuqs';
+import AbilityUsageStrip from '../components/AbilityUsageStrip';
 import AgentIcon from '../components/AgentIcon';
 import DateRangePicker from '../components/DateRangePicker';
 import GettingStarted from '../components/GettingStarted';
@@ -20,6 +21,7 @@ const STAT_COLUMNS: {
   render: (v: number) => string;
   bestIsLow?: boolean;
 }[] = [
+  { key: 'vlrRating', label: 'VLR', render: (v) => fmt(v, 2) },
   { key: 'acs', label: 'ACS', render: (v) => fmt(v, 0) },
   { key: 'kdr', label: 'KDR', render: (v) => fmt(v, 2) },
   { key: 'assists', label: 'A', render: (v) => fmt(v, 1) },
@@ -142,9 +144,12 @@ export default function PlayersPage() {
         else if (bv === undefined) cmp = -1;
         else cmp = av - bv;
       } else {
-        const av = a[sortKeyTyped] as number;
-        const bv = b[sortKeyTyped] as number;
-        cmp = (av ?? 0) - (bv ?? 0);
+        // Missing values (no VLR rating on hand-entered games) sort low.
+        const num = (v: unknown) =>
+          typeof v === 'number' && isFinite(v) ? v : -Infinity;
+        const av = num(a[sortKeyTyped]);
+        const bv = num(b[sortKeyTyped]);
+        cmp = av === bv ? 0 : av < bv ? -1 : 1;
       }
       if (cmp === 0) cmp = a.agent.localeCompare(b.agent);
       return sortDir === 'asc' ? cmp : -cmp;
@@ -288,7 +293,7 @@ export default function PlayersPage() {
         </div>
       ) : (
         <div className="card overflow-x-auto p-0">
-          <table className="w-full min-w-[1100px]">
+          <table className="w-full min-w-[1100px] [&_td]:text-[13px] [&_th]:text-[11px]">
             <thead className="bg-valorant-panel2/40">
               <tr>
                 <SortHeader
@@ -324,6 +329,15 @@ export default function PlayersPage() {
                   dir={sortDir}
                   onClick={handleSort}
                 />
+                <th
+                  className="table-head"
+                  title="C / Q / E: casts per round · X (ultimate): casts per map"
+                >
+                  Abilities{' '}
+                  <span className="normal-case font-normal text-valorant-muted">
+                    (per round · ult per map)
+                  </span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -343,6 +357,7 @@ export default function PlayersPage() {
                 <td className="table-cell">
                   <BestMapCell bestMap={stats.total.bestMap} />
                 </td>
+                <td className="table-cell text-valorant-muted text-xs">—</td>
               </tr>
               {sortedAgents.map((row) => (
                 <tr key={row.agent} className="border-t border-white/5">
@@ -387,6 +402,13 @@ export default function PlayersPage() {
                   })}
                   <td className="table-cell">
                     <BestMapCell bestMap={row.bestMap} />
+                  </td>
+                  <td className="table-cell">
+                    {row.abilities ? (
+                      <AbilityUsageStrip agent={row.agent} usage={row.abilities} size={18} />
+                    ) : (
+                      <span className="text-valorant-muted text-xs">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -441,12 +463,13 @@ function BestMapCell({
   return (
     <div
       className="flex items-center gap-2"
-      title={`${bestMap.avgAcs.toFixed(0)} avg ACS over ${bestMap.games} ${bestMap.games === 1 ? 'game' : 'games'}`}
+      title={`${isFinite(bestMap.avgVlr) ? `${bestMap.avgVlr.toFixed(2)} avg VLR · ` : ''}${bestMap.avgAcs.toFixed(0)} avg ACS over ${bestMap.games} ${bestMap.games === 1 ? 'game' : 'games'}`}
     >
       <MapIcon map={bestMap.map} width={40} height={22} />
       <div className="text-sm">
         <div className="font-medium">{bestMap.map}</div>
         <div className="text-xs text-valorant-muted tabular-nums">
+          {isFinite(bestMap.avgVlr) && <>{bestMap.avgVlr.toFixed(2)} VLR · </>}
           {bestMap.avgAcs.toFixed(0)} ACS · {bestMap.games}{' '}
           {bestMap.games === 1 ? 'game' : 'games'}
         </div>

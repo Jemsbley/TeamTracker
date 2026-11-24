@@ -1,6 +1,8 @@
 import { MAPS } from '../constants';
-import type { Game, Player, ValorantMap } from '../types';
+import type { Game, GameStat, Player, ValorantMap } from '../types';
+import { aggregateAbilities, type AbilityUsage } from './abilities';
 import { effectiveScore } from './rounds';
+import { avgVlr } from './stats';
 
 function gameWinForUs(g: Game): boolean | undefined {
   const sc = effectiveScore(g);
@@ -23,6 +25,8 @@ export type AgentBestPlayer = {
   playerId: string;
   name: string;
   avgAcs: number;
+  /** NaN if none of their games on this agent have a VLR rating. */
+  avgVlr: number;
   games: number;
 };
 
@@ -38,6 +42,10 @@ export type AgentStat = {
   selections: number;
   /** Avg ACS across every stat row using this agent. */
   avgAcs: number;
+  /** Avg VLR rating across stat rows that have one; NaN if none do. */
+  avgVlr: number;
+  /** Ability usage across every stat row using this agent; null if none recorded casts. */
+  abilities: AbilityUsage | null;
   byMap: AgentMapStat[];
   bestPlayer: AgentBestPlayer | null;
   /** Top 2 partners by win rate when played alongside this agent. */
@@ -112,16 +120,19 @@ export function computeAgentStats(
     }
 
     // Best player on this agent (and the agent's overall avg ACS).
-    const acsByPlayer = new Map<string, { sum: number; count: number }>();
+    const acsByPlayer = new Map<string, { sum: number; count: number; stats: GameStat[] }>();
+    const agentStats: GameStat[] = [];
     let totalAcs = 0;
     let totalAcsCount = 0;
     for (const g of games) {
       for (const s of g.stats) {
         if (s.agent !== agent) continue;
-        const cur = acsByPlayer.get(s.playerId) ?? { sum: 0, count: 0 };
+        const cur = acsByPlayer.get(s.playerId) ?? { sum: 0, count: 0, stats: [] };
         cur.sum += s.acs;
         cur.count += 1;
+        cur.stats.push(s);
         acsByPlayer.set(s.playerId, cur);
+        agentStats.push(s);
         totalAcs += s.acs;
         totalAcsCount += 1;
       }
@@ -129,7 +140,7 @@ export function computeAgentStats(
     const avgAcs = totalAcsCount > 0 ? totalAcs / totalAcsCount : 0;
     let bestPlayer: AgentBestPlayer | null = null;
     let bestAvg = -Infinity;
-    for (const [pid, { sum, count }] of acsByPlayer) {
+    for (const [pid, { sum, count, stats }] of acsByPlayer) {
       if (count === 0) continue;
       const avg = sum / count;
       if (avg > bestAvg) {
@@ -138,6 +149,7 @@ export function computeAgentStats(
           playerId: pid,
           name: playerById.get(pid)?.name ?? '?',
           avgAcs: avg,
+          avgVlr: avgVlr(stats),
           games: count,
         };
       }
@@ -167,6 +179,8 @@ export function computeAgentStats(
       agent,
       selections,
       avgAcs,
+      avgVlr: avgVlr(agentStats),
+      abilities: aggregateAbilities(agentStats.map((s) => s.abilities)),
       byMap,
       bestPlayer,
       topPartners,

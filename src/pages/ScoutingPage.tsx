@@ -4,7 +4,14 @@ import { useStore, canEditRoster } from '../store';
 import PageHeader from '../components/PageHeader';
 import WriteButton from '../components/WriteButton';
 import MapIcon from '../components/MapIcon';
-import { favoriteMap, withAllMaps } from '../utils/scouting';
+import { favoriteMap as legacyFavoriteMap } from '../utils/legacyScouting';
+import {
+  DEFAULT_MIN_PLAYERS,
+  defaultScoutSince,
+  favoriteMap,
+  isLegacyReport,
+  visibleScoutMatches,
+} from '../utils/scouting';
 import { defaultRosterId } from '../utils/rosters';
 
 export default function ScoutingPage() {
@@ -44,7 +51,11 @@ export default function ScoutingPage() {
       teamName: name,
       note: note.trim() || undefined,
       rosterId: rosterId || null,
-      maps: withAllMaps(),
+      tags: [],
+      includeMR24: false,
+      minPlayers: DEFAULT_MIN_PLAYERS,
+      since: defaultScoutSince(),
+      matches: [],
     });
     setTeamName('');
     setNote('');
@@ -124,7 +135,9 @@ export default function ScoutingPage() {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {sorted.map((r) => {
-              const favMap = favoriteMap(r.maps);
+              const legacy = isLegacyReport(r);
+              const favMap = legacy ? legacyFavoriteMap(r.maps ?? []) : favoriteMap(r);
+              const matchCount = legacy ? 0 : visibleScoutMatches(r).length;
               return (
                 <div
                   key={r.id}
@@ -143,6 +156,14 @@ export default function ScoutingPage() {
                       {rosterName(r.rosterId) && <span>{rosterName(r.rosterId)}</span>}
                       {rosterName(r.rosterId) && r.createdAt && <span>·</span>}
                       {r.createdAt && <span>{r.createdAt}</span>}
+                      {!legacy && (rosterName(r.rosterId) || r.createdAt) && <span>·</span>}
+                      {!legacy && (
+                        <span>
+                          {matchCount > 0
+                            ? `${matchCount} ${matchCount === 1 ? 'match' : 'matches'}`
+                            : 'No matches yet'}
+                        </span>
+                      )}
                     </div>
                     {favMap && (
                       <div className="flex items-center gap-1.5 text-xs text-valorant-muted mt-1.5">
