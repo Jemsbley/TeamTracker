@@ -168,7 +168,12 @@ export default function PlayerStatsTable({
 
   return (
     <div className="card overflow-x-auto p-0">
-      <table className="w-full min-w-[1150px]">
+      <table
+        // Sized to its content (no min width) with tight cell padding so it
+        // fits without sideways scrolling, including the half-width slot on
+        // the Win/Loss tabs. The outer edges keep a little breathing room.
+        className="w-full [&_td]:px-1 [&_th]:px-1 [&_td]:text-[13px] [&_th]:text-[10px] [&_th]:tracking-normal [&_td:first-child]:pl-3 [&_th:first-child]:pl-3 [&_td:last-child]:pr-3 [&_th:last-child]:pr-3"
+      >
         <thead className="bg-valorant-panel2/40">
           <tr>
             {COLUMNS.map((c) => (
@@ -247,7 +252,7 @@ export default function PlayerStatsTable({
                     {player.name}
                   </span>
                   {!player.isMainRoster && (
-                    <span className="text-xs uppercase tracking-wide text-valorant-muted px-1 py-0.5 rounded bg-white/5">
+                    <span className="text-[10px] uppercase tracking-wide text-valorant-muted px-1 py-0.5 rounded bg-white/5">
                       Sub
                     </span>
                   )}

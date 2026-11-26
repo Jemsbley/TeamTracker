@@ -216,10 +216,12 @@ export default function WinLossStatsTab({
       </div>
 
       <div className="flex flex-wrap items-start gap-4">
-        <div className="w-full lg:w-80 shrink-0">
+        {/* Side by side only on xl screens: below that the metrics stack on
+            top so the scoreboard gets the full width and never scrolls. */}
+        <div className="w-full xl:w-80 shrink-0">
           <MetricRankSection title="Percentage stats" metrics={sortedPercent} />
         </div>
-        <div className="flex-1 min-w-[480px] space-y-6">
+        <div className="flex-1 min-w-0 space-y-6">
           <div className="space-y-2">
             <h3 className="font-semibold">Scoreboard</h3>
             <PlayerStatsTable

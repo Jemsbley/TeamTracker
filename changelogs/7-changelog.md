@@ -135,7 +135,9 @@ which the heatmap leaves out.
   all four, including the comparison arrows on map pages.
 - **Scoreboards** (`PlayerStatsTable`, used by the Stats tabs, series and map
   pages, and scouting): four columns, `FD Tr%`, `FB Tr%`, `D Tr%` and
-  `K Tr%`, with header tooltips. The minimum width went from 900px to 1150px.
+  `K Tr%`, with header tooltips. To fit, the table lost its 900px minimum
+  width and now sizes to its content, with 4px cell padding, 13px values and
+  10px headers.
 - **Players tab:** four columns per agent and in the All row.
 - **Maps tab:** Kill trade% and Death trade%, plus new team **FB%** / **FD%**
   (first kills / first deaths ÷ rounds played, same definition as the
@@ -176,10 +178,9 @@ which the heatmap leaves out.
     as the *hidden* set, so columns added later show by default. This is a
     deliberate exception to the "view state in the URL" convention: it's a
     personal display preference, not a shareable view.
-  - The table's minimum width scales with the visible columns.
   - Hiding the column the table is sorted by resets the sort.
-- **Density:** cell side padding is 6px and the extra right padding on number
-  columns is gone. Faint column dividers use the row-divider colour
+- **Density:** no minimum width; cell side padding is 4px, the extra right
+  padding on number columns is gone, and header letter spacing is normal. Faint column dividers use the row-divider colour
   (`white/5`).
 
 ---
@@ -270,9 +271,12 @@ Run outside the browser against local data:
   count toward the trade stats. The 5s window is fixed in `TRADE_WINDOW_MS`.
 - **Older scouting uploads without heatmap data have no trades.** Uploading
   the files again fills them in.
-- **Scoreboard and table widths grew.** The half-width scoreboard on When we
-  win/lose scrolls sideways more than before; the Players table may still
-  scroll on small laptops with every column shown.
+- **No minimum widths on the scoreboard or Players table.** Both size to their
+  content with 4px cell padding. The scoreboard needs about 730px (estimated,
+  not measured), so When we win/lose stacks its metrics above the scoreboard
+  below the `xl` breakpoint. The Players table needs about 1150px with every
+  column shown, so it could still scroll below roughly 1280px. Hiding columns
+  with the gear fixes that.
 - **The Players column choice is per browser.** It's in `localStorage`, so it
   doesn't follow you across devices and isn't in shared links.
 - **`MAP_COLORS` needs a new entry** whenever a map is added (TypeScript will

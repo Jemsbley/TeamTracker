@@ -73,14 +73,6 @@ const TOGGLEABLE_COLUMNS: { key: string; label: string; tooltip?: string }[] = [
   },
 ];
 
-/** Rough share of the table's width each column takes, used to shrink the
- * table's minimum width as columns are hidden. */
-const COLUMN_WEIGHT: Record<string, number> = { agent: 150, bestMap: 120, abilities: 100 };
-const weightOf = (key: string) => COLUMN_WEIGHT[key] ?? 58;
-const FULL_MIN_WIDTH = 1000;
-const FULL_WEIGHT =
-  weightOf('agent') + TOGGLEABLE_COLUMNS.reduce((sum, c) => sum + weightOf(c.key), 0);
-
 // Hidden columns are a personal display preference, not shareable view state,
 // so they live in localStorage rather than the URL. Storing the hidden set
 // (not the shown one) means columns added later show up by default.
@@ -260,12 +252,6 @@ export default function PlayersPage() {
   const crosshair = useTableCrosshair();
   const show = (key: string) => !hiddenCols.has(key);
   const visibleStatColumns = STAT_COLUMNS.filter((c) => show(c.key as string));
-  const tableMinWidth = Math.round(
-    (FULL_MIN_WIDTH *
-      (weightOf('agent') +
-        TOGGLEABLE_COLUMNS.filter((c) => show(c.key)).reduce((sum, c) => sum + weightOf(c.key), 0))) /
-      FULL_WEIGHT
-  );
   const toggleColumn = (key: string) => {
     const next = new Set(hiddenCols);
     if (next.has(key)) next.delete(key);
@@ -428,8 +414,7 @@ export default function PlayersPage() {
           <table
             onMouseOver={crosshair.tableProps.onMouseOver}
             onMouseLeave={crosshair.tableProps.onMouseLeave}
-            className={`${crosshair.tableProps.className} w-full [&_td]:text-[13px] [&_th]:text-[11px] [&_td]:px-1.5 [&_th]:px-1.5 [&_td+td]:border-l [&_th+th]:border-l [&_td]:border-white/5 [&_th]:border-white/5`}
-            style={{ minWidth: tableMinWidth }}
+            className={`${crosshair.tableProps.className} w-full [&_td]:text-[13px] [&_th]:text-[11px] [&_td]:px-1 [&_th]:px-1 [&_th]:tracking-normal [&_td:first-child]:pl-3 [&_th:first-child]:pl-3 [&_td+td]:border-l [&_th+th]:border-l [&_td]:border-white/5 [&_th]:border-white/5`}
           >
             <thead className="bg-valorant-panel2/40">
               <tr>
