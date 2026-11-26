@@ -2,6 +2,7 @@ import type { Game, GameStat, ValorantMap } from '../types';
 import { aggregateAbilities, type AbilityUsage } from './abilities';
 import { effectiveClutchWon, roundsPlayedIn } from './rounds';
 import { avgVlr } from './stats';
+import { sumTrades, tradeRates } from './trades';
 
 type Entry = {
   stat: GameStat;
@@ -33,6 +34,11 @@ export type PlayerAggregate = {
   firstDeathPercent: number;
   /** % of this player's marked clutch attempts that were won: won / (won + lost). */
   clutchPercent: number;
+  /** Trade rates in %, over maps with trade data; NaN if none have it. */
+  fdTradedPct: number;
+  fbTradedPct: number;
+  deathTradePct: number;
+  killTradePct: number;
   bestMap: BestMap | null;
   /** Ability usage across these games; null if none recorded casts. */
   abilities: AbilityUsage | null;
@@ -61,6 +67,10 @@ const ZERO: PlayerAggregate = {
   firstBloodPercent: 0,
   firstDeathPercent: 0,
   clutchPercent: 0,
+  fdTradedPct: NaN,
+  fbTradedPct: NaN,
+  deathTradePct: NaN,
+  killTradePct: NaN,
   bestMap: null,
   abilities: null,
 };
@@ -79,6 +89,7 @@ function aggregate(entries: Entry[]): PlayerAggregate {
   const totalRoundsPlayed = entries.reduce((a, e) => a + e.roundsPlayed, 0);
   const totalClutches = entries.reduce((a, e) => a + e.clutches, 0);
   const totalClutchesWon = entries.reduce((a, e) => a + e.clutchesWon, 0);
+  const trades = tradeRates(sumTrades(entries.map((e) => e.stat)));
   return {
     selections: n,
     vlrRating: avgVlr(entries.map((e) => e.stat)),
@@ -95,6 +106,10 @@ function aggregate(entries: Entry[]): PlayerAggregate {
     firstBloodPercent: totalRoundsPlayed ? (sum('firstKills') / totalRoundsPlayed) * 100 : 0,
     firstDeathPercent: totalRoundsPlayed ? (sum('firstDeaths') / totalRoundsPlayed) * 100 : 0,
     clutchPercent: totalClutches ? (totalClutchesWon / totalClutches) * 100 : 0,
+    fdTradedPct: trades.fdTraded,
+    fbTradedPct: trades.fbTraded,
+    deathTradePct: trades.deathTrade,
+    killTradePct: trades.killTrade,
     bestMap: bestMapFor(entries),
     abilities: aggregateAbilities(entries.map((e) => e.stat.abilities)),
   };

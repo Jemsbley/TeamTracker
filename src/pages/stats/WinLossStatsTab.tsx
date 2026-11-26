@@ -454,6 +454,14 @@ function RankedSeries({
   );
 }
 
+const OPTIONAL_STATS = new Set<keyof Aggregate>([
+  'vlrRating',
+  'fdTradedPct',
+  'fbTradedPct',
+  'deathTradePct',
+  'killTradePct',
+]);
+
 /** Element-wise mean of a list of Aggregates. Empty list -> zeros. */
 function averageAggregates(aggs: Aggregate[]): Aggregate {
   const out: Aggregate = {
@@ -471,6 +479,10 @@ function averageAggregates(aggs: Aggregate[]): Aggregate {
     firstKills: 0,
     firstDeaths: 0,
     multikills: 0,
+    fdTradedPct: 0,
+    fbTradedPct: 0,
+    deathTradePct: 0,
+    killTradePct: 0,
   };
   if (aggs.length === 0) return out;
   const keys = Object.keys(out) as (keyof Aggregate)[];
@@ -484,7 +496,9 @@ function averageAggregates(aggs: Aggregate[]): Aggregate {
       sum += v;
       n += 1;
     }
-    out[k] = (n > 0 ? sum / n : k === 'vlrRating' ? NaN : 0) as Aggregate[typeof k];
+    // Stats only some maps have (VLR, trades) are NaN rather than 0 when no
+    // map in the slice has them, so they render as a dash.
+    out[k] = (n > 0 ? sum / n : OPTIONAL_STATS.has(k) ? NaN : 0) as Aggregate[typeof k];
   }
   out.games = aggs.reduce((acc, a) => acc + a.games, 0);
   return out;

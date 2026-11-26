@@ -1,10 +1,11 @@
 import { MAPS } from '../constants';
-import type { Game, GameStat, Player, ScoutMatch, ScoutingReport, ValorantMap } from '../types';
+import type { Game, GameStat, Player, ScoutMatch, ScoutingReport, TradeCounts, ValorantMap } from '../types';
 import { aggregateAbilities, type AbilityUsage } from './abilities';
 import { buildHeatmapMatchFromRawExport, isHeatmapRawExport } from './heatmapData';
 import { aggregateEconomy, type RoundEconomy } from './rounds';
 import { gameOutcome } from './stats';
 import { parseTrackerMatch, projectRoundsForTeam } from './trackerImport';
+import { computeTrades, type TimelineKill } from './trades';
 
 export const MIN_TAGS = 5;
 export const MAX_TAGS = 10;
@@ -377,15 +378,50 @@ export function visibleScoutMatches(report: ScoutingReport): ScoutMatch[] {
 
 /** Matches as Games, so the team's own stat and round helpers apply. */
 export function scoutGames(matches: ScoutMatch[]): Game[] {
-  return matches.map((m) => ({
-    id: m.id,
-    seriesId: '',
-    map: m.map,
-    date: m.date,
-    startingSide: m.startingSide,
-    rounds: m.rounds,
-    stats: m.stats,
-  }));
+  return matches.map((m) => {
+    // Uploads from before trades were tracked lack them on their stat lines;
+    // fill them in from the heatmap's kill timeline when it's there.
+    const missing = m.stats.some((s) => !s.trades);
+    const fromHeatmap = missing ? scoutTradesFromHeatmap(m) : null;
+    return {
+      id: m.id,
+      seriesId: '',
+      map: m.map,
+      date: m.date,
+      startingSide: m.startingSide,
+      rounds: m.rounds,
+      stats: fromHeatmap
+        ? m.stats.map((s) => {
+            const t = s.trades ?? fromHeatmap.get(s.playerId);
+            return t ? { ...s, trades: t } : s;
+          })
+        : m.stats,
+    };
+  });
+}
+
+/** Trade counts per playerId (scoutKey) from a scouting match's heatmap
+ * points: its kill points are the scouted team's kills, its death points
+ * their deaths, which together are every kill the trades need. */
+function scoutTradesFromHeatmap(m: ScoutMatch): Map<string, TradeCounts> | null {
+  if (!m.heatmap) return null;
+  const team = new Set(m.heatmap.events.map((e) => e.player));
+  const kills: TimelineKill[] = [];
+  for (const e of m.heatmap.events) {
+    if (!e.opponent) continue;
+    kills.push(
+      e.kind === 'kill'
+        ? { round: e.round, t: e.roundTime, killer: e.player, victim: e.opponent }
+        : { round: e.round, t: e.roundTime, killer: e.opponent, victim: e.player }
+    );
+  }
+  const byIdentifier = computeTrades(kills, (id) => (team.has(id) ? 'us' : 'them'));
+  const out = new Map<string, TradeCounts>();
+  for (const id of team) {
+    const t = byIdentifier.get(id);
+    if (t) out.set(scoutKey(id), t);
+  }
+  return out;
 }
 
 /** Scoreboard rows: the report's players first, then anyone else who played

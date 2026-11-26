@@ -1,5 +1,6 @@
 import type { RoundEconomy } from '../utils/rounds';
 import { pct } from '../utils/rounds';
+import { TRADE_RATE_KEYS, TRADE_STAT_INFO, tradeFraction } from '../utils/trades';
 
 /**
  * Interpolate between pastel rose red (0%) and pastel lime green (100%), or
@@ -150,6 +151,27 @@ export default function RoundEconomyPanel({
             compact={compact}
             cmp={compare?.clutch}
           />
+        </div>
+        {/* Trades come from the tracker.gg kill timeline, so maps entered by
+            hand don't count toward these. */}
+        <div className="stat-grid mt-2">
+          {TRADE_RATE_KEYS.map((key) => {
+            const info = TRADE_STAT_INFO[key];
+            const [n, d] = tradeFraction(economy.trades, key);
+            const cmp = compare ? tradeFraction(compare.trades, key) : undefined;
+            return (
+              <Cell
+                key={key}
+                label={info.label}
+                tooltip={`${info.tooltip}: ${n} / ${d} (tracker.gg imports only)`}
+                wins={n}
+                total={d}
+                compact={compact}
+                lowerIsBetter={info.lowerIsBetter}
+                cmp={cmp ? { wins: cmp[0], total: cmp[1] } : undefined}
+              />
+            );
+          })}
         </div>
       </div>
 

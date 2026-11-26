@@ -1,5 +1,6 @@
 import type { Game, GameStat, Series, ValorantMap } from '../types';
 import { effectiveScore } from './rounds';
+import { TRADE_STAT_INFO, sumTrades, tradeRates } from './trades';
 
 export type StatFilters = {
   map?: ValorantMap | 'all';
@@ -10,12 +11,15 @@ export type StatFilters = {
    */
   agents?: string[];
   /**
-   * Narrows the agent-lineup check above to one player's picks, so a game
-   * qualifies only if THAT player played every listed agent (rather than
-   * anyone on the team). No effect unless `agents` is also set.
+   * Only games this player played in. Also narrows the agent-lineup check
+   * above to their picks, so a game qualifies only if THAT player played
+   * every listed agent (rather than anyone on the team).
    */
   playerId?: string;
   seriesId?: string | 'all';
+  /** Inclusive ISO `YYYY-MM-DD` date bounds. Unset = open-ended. */
+  startDate?: string;
+  endDate?: string;
 };
 
 export type Aggregate = {
@@ -34,6 +38,12 @@ export type Aggregate = {
   firstKills: number;
   firstDeaths: number;
   multikills: number;
+  /** Trade rates in % over stat lines that have trade data (tracker imports);
+   * NaN when none do. See utils/trades.ts. */
+  fdTradedPct: number;
+  fbTradedPct: number;
+  deathTradePct: number;
+  killTradePct: number;
 };
 
 export const ZERO_AGG: Aggregate = {
@@ -51,12 +61,19 @@ export const ZERO_AGG: Aggregate = {
   firstKills: 0,
   firstDeaths: 0,
   multikills: 0,
+  fdTradedPct: NaN,
+  fbTradedPct: NaN,
+  deathTradePct: NaN,
+  killTradePct: NaN,
 };
 
 export function gameMatches(g: Game, f: StatFilters): boolean {
   if (f.map && f.map !== 'all' && g.map !== f.map) return false;
   if (f.seriesId && f.seriesId !== 'all' && g.seriesId !== f.seriesId)
     return false;
+  if (f.startDate && g.date < f.startDate) return false;
+  if (f.endDate && g.date > f.endDate) return false;
+  if (f.playerId && !g.stats.some((s) => s.playerId === f.playerId)) return false;
   if (f.agents && f.agents.length > 0) {
     const relevantStats = f.playerId
       ? g.stats.filter((s) => s.playerId === f.playerId)
@@ -108,6 +125,7 @@ export function aggregate(stats: GameStat[]): Aggregate {
   if (!stats.length) return { ...ZERO_AGG };
   const totalKills = stats.reduce((a, s) => a + s.kills, 0);
   const totalDeaths = stats.reduce((a, s) => a + s.deaths, 0);
+  const trades = tradeRates(sumTrades(stats));
   return {
     games: stats.length,
     vlrRating: avgVlr(stats),
@@ -123,6 +141,10 @@ export function aggregate(stats: GameStat[]): Aggregate {
     firstKills: avg(stats.map((s) => s.firstKills)),
     firstDeaths: avg(stats.map((s) => s.firstDeaths)),
     multikills: avg(stats.map((s) => s.multikills)),
+    fdTradedPct: trades.fdTraded,
+    fbTradedPct: trades.fbTraded,
+    deathTradePct: trades.deathTrade,
+    killTradePct: trades.killTrade,
   };
 }
 
@@ -180,6 +202,22 @@ export const STAT_DEFS: StatDef[] = [
   { key: 'firstKills', label: 'FK', format: (v) => fmt(v, 1), isPercent: false },
   { key: 'firstDeaths', label: 'FD', format: (v) => fmt(v, 1), isPercent: false, lowerIsBetter: true },
   { key: 'multikills', label: 'MK', format: (v) => fmt(v, 1), isPercent: false },
+  ...(
+    [
+      ['fdTradedPct', TRADE_STAT_INFO.fdTraded],
+      ['fbTradedPct', TRADE_STAT_INFO.fbTraded],
+      ['deathTradePct', TRADE_STAT_INFO.deathTrade],
+      ['killTradePct', TRADE_STAT_INFO.killTrade],
+    ] as const
+  ).map(
+    ([key, info]): StatDef => ({
+      key,
+      label: info.label,
+      format: (v) => fmtPct(v, 1),
+      isPercent: true,
+      ...(info.lowerIsBetter ? { lowerIsBetter: true } : {}),
+    })
+  ),
 ];
 
 export function gameOutcome(g: Game): 'W' | 'L' | undefined {

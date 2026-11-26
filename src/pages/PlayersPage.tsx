@@ -1,18 +1,19 @@
-import { useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, type To } from 'react-router-dom';
 import { parseAsString, parseAsStringEnum, useQueryState } from 'nuqs';
 import AbilityUsageStrip from '../components/AbilityUsageStrip';
 import AgentIcon from '../components/AgentIcon';
+import { useTableCrosshair } from '../components/useTableCrosshair';
 import DateRangePicker from '../components/DateRangePicker';
 import GettingStarted from '../components/GettingStarted';
-import MapIcon from '../components/MapIcon';
 import MapPicker from '../components/MapPicker';
 import PageHeader from '../components/PageHeader';
-import { MAPS } from '../constants';
+import { MAPS, MAP_COLORS } from '../constants';
 import { useStore } from '../store';
 import { defaultRosterId } from '../utils/rosters';
 import { computePlayerStats, type PlayerAggregate } from '../utils/playerStats';
 import { fmt, fmtPct, fmtSigned } from '../utils/stats';
+import { TRADE_STAT_INFO } from '../utils/trades';
 import type { ValorantMap } from '../types';
 
 const STAT_COLUMNS: {
@@ -20,25 +21,92 @@ const STAT_COLUMNS: {
   label: string;
   render: (v: number) => string;
   bestIsLow?: boolean;
+  tooltip?: string;
 }[] = [
-  { key: 'vlrRating', label: 'VLR', render: (v) => fmt(v, 2) },
-  { key: 'acs', label: 'ACS', render: (v) => fmt(v, 0) },
-  { key: 'kdr', label: 'KDR', render: (v) => fmt(v, 2) },
-  { key: 'assists', label: 'A', render: (v) => fmt(v, 1) },
-  { key: 'damageDelta', label: 'DDΔ', render: (v) => fmtSigned(v, 0) },
-  { key: 'adr', label: 'ADR', render: (v) => fmt(v, 0) },
-  { key: 'hsPercent', label: 'HS%', render: (v) => fmtPct(v, 1) },
-  { key: 'kastPercent', label: 'KAST%', render: (v) => fmtPct(v, 1) },
-  { key: 'firstKills', label: 'FK', render: (v) => fmt(v, 1) },
-  { key: 'firstDeaths', label: 'FD', render: (v) => fmt(v, 1), bestIsLow: true },
-  { key: 'multikills', label: 'MK', render: (v) => fmt(v, 1) },
-  { key: 'firstBloodPercent', label: 'FB%', render: (v) => fmtPct(v, 1) },
-  { key: 'firstDeathPercent', label: 'FD%', render: (v) => fmtPct(v, 1), bestIsLow: true },
-  { key: 'clutchPercent', label: 'Clutch%', render: (v) => fmtPct(v, 1) },
+  { key: 'vlrRating', label: 'VLR', render: (v) => fmt(v, 2), tooltip: 'Average VLR rating (estimate of vlr.gg’s Rating 2.0) per map. Tracker.gg imports only' },
+  { key: 'acs', label: 'ACS', render: (v) => fmt(v, 0), tooltip: 'Average combat score per map' },
+  { key: 'kdr', label: 'KDR', render: (v) => fmt(v, 2), tooltip: 'Total kills ÷ total deaths' },
+  { key: 'assists', label: 'A', render: (v) => fmt(v, 1), tooltip: 'Average assists per map' },
+  { key: 'damageDelta', label: 'DDΔ', render: (v) => fmtSigned(v, 0), tooltip: 'Damage delta: damage dealt minus damage taken, per round' },
+  { key: 'adr', label: 'ADR', render: (v) => fmt(v, 0), tooltip: 'Average damage per round' },
+  { key: 'hsPercent', label: 'HS%', render: (v) => fmtPct(v, 1), tooltip: 'Headshot %: share of hits that landed on the head' },
+  { key: 'kastPercent', label: 'KAST%', render: (v) => fmtPct(v, 1), tooltip: 'Rounds with a kill, assist, survival or trade ÷ rounds played' },
+  { key: 'firstKills', label: 'FK', render: (v) => fmt(v, 1), tooltip: 'Average first kills (the round’s opening kill) per map' },
+  { key: 'firstDeaths', label: 'FD', render: (v) => fmt(v, 1), bestIsLow: true, tooltip: 'Average first deaths (the round’s first player to die) per map' },
+  { key: 'multikills', label: 'MK', render: (v) => fmt(v, 1), tooltip: 'Average multikills (rounds with 3+ kills) per map' },
+  { key: 'firstBloodPercent', label: 'FB%', render: (v) => fmtPct(v, 1), tooltip: 'Rounds where this player got the first kill ÷ rounds played' },
+  { key: 'firstDeathPercent', label: 'FD%', render: (v) => fmtPct(v, 1), bestIsLow: true, tooltip: 'Rounds where this player died first ÷ rounds played' },
+  { key: 'clutchPercent', label: 'CL%', render: (v) => fmtPct(v, 1), tooltip: 'Clutch win %: clutches won ÷ clutches played (rounds marked as clutches)' },
+  ...(
+    [
+      ['fdTradedPct', TRADE_STAT_INFO.fdTraded],
+      ['fbTradedPct', TRADE_STAT_INFO.fbTraded],
+      ['deathTradePct', TRADE_STAT_INFO.deathTrade],
+      ['killTradePct', TRADE_STAT_INFO.killTrade],
+    ] as const
+  ).map(([key, info]) => ({
+    key,
+    label: info.short,
+    render: (v: number) => fmtPct(v, 0),
+    bestIsLow: info.lowerIsBetter,
+    tooltip: `${info.label}: ${info.tooltip} (tracker.gg imports only)`,
+  })),
 ];
 
 type SortKey = 'agent' | 'selections' | keyof PlayerAggregate | 'bestMap';
 type SortDir = 'asc' | 'desc';
+
+/** Every column the "Columns" menu can hide, in table order. Agent is always shown. */
+const TOGGLEABLE_COLUMNS: { key: string; label: string; tooltip?: string }[] = [
+  { key: 'selections', label: 'GP', tooltip: 'Games played on this agent' },
+  ...STAT_COLUMNS.map((c) => ({ key: c.key as string, label: c.label, tooltip: c.tooltip })),
+  {
+    key: 'bestMap',
+    label: 'Best Map',
+    tooltip: 'The map where this player has their highest average ACS on this agent',
+  },
+  {
+    key: 'abilities',
+    label: 'Abil',
+    tooltip:
+      'Ability usage: C / Q / E casts per round · X (ultimate) casts per map. Hover an icon for exact counts',
+  },
+];
+
+/** Rough share of the table's width each column takes, used to shrink the
+ * table's minimum width as columns are hidden. */
+const COLUMN_WEIGHT: Record<string, number> = { agent: 150, bestMap: 120, abilities: 100 };
+const weightOf = (key: string) => COLUMN_WEIGHT[key] ?? 58;
+const FULL_MIN_WIDTH = 1000;
+const FULL_WEIGHT =
+  weightOf('agent') + TOGGLEABLE_COLUMNS.reduce((sum, c) => sum + weightOf(c.key), 0);
+
+// Hidden columns are a personal display preference, not shareable view state,
+// so they live in localStorage rather than the URL. Storing the hidden set
+// (not the shown one) means columns added later show up by default.
+const HIDDEN_COLUMNS_KEY = 'players-table-hidden-columns';
+
+function readHiddenColumns(): string[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(HIDDEN_COLUMNS_KEY) ?? '[]');
+    return Array.isArray(parsed) ? parsed.filter((k): k is string => typeof k === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function useHiddenColumns(): [Set<string>, (next: Set<string>) => void] {
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set(readHiddenColumns()));
+  const update = (next: Set<string>) => {
+    setHidden(next);
+    try {
+      localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify([...next]));
+    } catch {
+      // Storage unavailable (private mode etc.): the choice just won't persist.
+    }
+  };
+  return [hidden, update];
+}
 
 export default function PlayersPage() {
   const rosters = useStore((s) => s.rosters);
@@ -64,6 +132,20 @@ export default function PlayersPage() {
   );
   const [startDate, setStartDate] = useQueryState('start', parseAsString);
   const [endDate, setEndDate] = useQueryState('end', parseAsString);
+
+  // Roster and player are what's being viewed, not filters, so they stay put.
+  const hasActiveFilters =
+    mapFilter !== null ||
+    seriesFilter !== '' ||
+    startDate !== null ||
+    endDate !== null;
+
+  const resetFilters = () => {
+    setMapFilter(null);
+    setSeriesFilter('');
+    setStartDate(null);
+    setEndDate(null);
+  };
 
   // Keep roster valid, defaulting to the primary roster.
   useEffect(() => {
@@ -174,7 +256,48 @@ export default function PlayersPage() {
     return out;
   }, [stats]);
 
+  const [hiddenCols, setHiddenCols] = useHiddenColumns();
+  const crosshair = useTableCrosshair();
+  const show = (key: string) => !hiddenCols.has(key);
+  const visibleStatColumns = STAT_COLUMNS.filter((c) => show(c.key as string));
+  const tableMinWidth = Math.round(
+    (FULL_MIN_WIDTH *
+      (weightOf('agent') +
+        TOGGLEABLE_COLUMNS.filter((c) => show(c.key)).reduce((sum, c) => sum + weightOf(c.key), 0))) /
+      FULL_WEIGHT
+  );
+  const toggleColumn = (key: string) => {
+    const next = new Set(hiddenCols);
+    if (next.has(key)) next.delete(key);
+    else {
+      next.add(key);
+      // Don't leave the rows sorted by a column that's no longer visible.
+      if (sortKeyTyped === key) {
+        setSortKey(null);
+        setSortDir(null);
+      }
+    }
+    setHiddenCols(next);
+  };
+
   const selectedPlayer = rosterPlayers.find((p) => p.id === playerId);
+
+  /** Stats page (Overall tab) for the maps this player played, optionally
+   * narrowed to one agent and/or map. Carries this page's series and date
+   * filters (and map filter, unless a map is given) so it shows the same games. */
+  const statsLink = (opts: { agent?: string; map?: ValorantMap }) => ({
+    pathname: '/',
+    search: new URLSearchParams({
+      tab: 'overall',
+      roster: rosterId,
+      player: playerId,
+      ...(opts.agent && { agents: opts.agent }),
+      ...((opts.map ?? mapFilter) && { map: (opts.map ?? mapFilter) as string }),
+      ...(seriesFilter && { series: seriesFilter }),
+      ...(startDate && { start: startDate }),
+      ...(endDate && { end: endDate }),
+    }).toString(),
+  });
 
   if (rosters.length === 0 || series.length === 0) {
     return <GettingStarted hasRoster={rosters.length > 0} />;
@@ -187,7 +310,7 @@ export default function PlayersPage() {
         titleGrow={false}
         description="Per-player breakdown by agent"
       >
-      <div className="flex flex-wrap gap-3 items-end">
+      <div data-grow className="flex flex-wrap gap-3 items-end">
         <div>
           <label className="label">Roster</label>
           <select
@@ -276,6 +399,14 @@ export default function PlayersPage() {
               ))}
           </select>
         </div>
+        <button
+          type="button"
+          onClick={resetFilters}
+          disabled={!hasActiveFilters}
+          className="ml-auto text-sm text-valorant-muted hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Reset filters
+        </button>
       </div>
       </PageHeader>
 
@@ -293,7 +424,13 @@ export default function PlayersPage() {
         </div>
       ) : (
         <div className="card overflow-x-auto p-0">
-          <table className="w-full min-w-[1100px] [&_td]:text-[13px] [&_th]:text-[11px]">
+          {crosshair.style}
+          <table
+            onMouseOver={crosshair.tableProps.onMouseOver}
+            onMouseLeave={crosshair.tableProps.onMouseLeave}
+            className={`${crosshair.tableProps.className} w-full [&_td]:text-[13px] [&_th]:text-[11px] [&_td]:px-1.5 [&_th]:px-1.5 [&_td+td]:border-l [&_th+th]:border-l [&_td]:border-white/5 [&_th]:border-white/5`}
+            style={{ minWidth: tableMinWidth }}
+          >
             <thead className="bg-valorant-panel2/40">
               <tr>
                 <SortHeader
@@ -304,74 +441,92 @@ export default function PlayersPage() {
                   dir={sortDir}
                   onClick={handleSort}
                 />
+                {show('selections') && (
                 <SortHeader
                   label="GP"
+                  title="Games played on this agent"
                   k="selections"
                   active={sortKeyTyped}
                   dir={sortDir}
                   onClick={handleSort}
                 />
-                {STAT_COLUMNS.map((c) => (
+                )}
+                {visibleStatColumns.map((c) => (
                   <SortHeader
                     key={c.key as string}
                     label={c.label}
+                    title={c.tooltip}
                     k={c.key}
                     active={sortKeyTyped}
                     dir={sortDir}
                     onClick={handleSort}
                   />
                 ))}
+                {show('bestMap') && (
                 <SortHeader
                   label="Best Map"
+                  title="The map where this player has their highest average ACS on this agent"
                   k="bestMap"
                   align="left"
                   active={sortKeyTyped}
                   dir={sortDir}
                   onClick={handleSort}
                 />
+                )}
+                {show('abilities') && (
                 <th
                   className="table-head"
-                  title="C / Q / E: casts per round · X (ultimate): casts per map"
+                  title="Ability usage: C / Q / E casts per round · X (ultimate) casts per map. Hover an icon for exact counts"
                 >
-                  Abilities{' '}
-                  <span className="normal-case font-normal text-valorant-muted">
-                    (per round · ult per map)
-                  </span>
+                  Abil
+                </th>
+                )}
+                {/* Column picker, in its own narrow column so it never covers a label. */}
+                <th className="table-head w-8 !pl-0 text-right !border-l-0">
+                  <ColumnPicker
+                    hidden={hiddenCols}
+                    onToggle={toggleColumn}
+                    onShowAll={() => setHiddenCols(new Set())}
+                  />
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr className="border-t border-white/10 bg-valorant-accent/10">
                 <td className="table-cell font-semibold">All</td>
-                <td className="table-cell text-right pr-5 text-valorant-muted font-semibold">
+                {show('selections') && (
+                <td className="table-cell text-right text-valorant-muted font-semibold">
                   —
                 </td>
-                {STAT_COLUMNS.map((c) => (
+                )}
+                {visibleStatColumns.map((c) => (
                   <td
                     key={c.key as string}
-                    className="table-cell text-right pr-5 tabular-nums font-semibold"
+                    className="table-cell text-right tabular-nums font-semibold"
                   >
                     {c.render(stats.total[c.key] as number)}
                   </td>
                 ))}
+                {show('bestMap') && (
                 <td className="table-cell">
-                  <BestMapCell bestMap={stats.total.bestMap} />
+                  <BestMapCell
+                    bestMap={stats.total.bestMap}
+                    to={stats.total.bestMap && statsLink({ map: stats.total.bestMap.map })}
+                    linkTitle={
+                      stats.total.bestMap &&
+                      `Open team stats filtered to maps where ${selectedPlayer?.name} played ${stats.total.bestMap.map}`
+                    }
+                  />
                 </td>
-                <td className="table-cell text-valorant-muted text-xs">—</td>
+                )}
+                {show('abilities') && <td className="table-cell text-valorant-muted text-xs">—</td>}
+                <td className="!border-l-0" />
               </tr>
               {sortedAgents.map((row) => (
                 <tr key={row.agent} className="border-t border-white/5">
                   <td className="table-cell">
                     <Link
-                      to={{
-                        pathname: '/',
-                        search: new URLSearchParams({
-                          tab: 'overall',
-                          roster: rosterId,
-                          player: playerId,
-                          agents: row.agent,
-                        }).toString(),
-                      }}
+                      to={statsLink({ agent: row.agent })}
                       className="flex items-center gap-2 hover:text-valorant-red"
                       title={`Open team stats filtered to maps where ${selectedPlayer?.name} played ${row.agent}`}
                     >
@@ -379,10 +534,12 @@ export default function PlayersPage() {
                       <span className="font-medium">{row.agent}</span>
                     </Link>
                   </td>
-                  <td className="table-cell text-right pr-5 tabular-nums">
+                  {show('selections') && (
+                  <td className="table-cell text-right tabular-nums">
                     {row.selections}
                   </td>
-                  {STAT_COLUMNS.map((c) => {
+                  )}
+                  {visibleStatColumns.map((c) => {
                     const v = row[c.key] as number;
                     const best = bestByCol[c.key];
                     const isBest =
@@ -392,7 +549,7 @@ export default function PlayersPage() {
                     return (
                       <td
                         key={c.key as string}
-                        className={`table-cell text-right pr-5 tabular-nums ${
+                        className={`table-cell text-right tabular-nums ${
                           isBest ? 'text-yellow-300' : ''
                         }`}
                       >
@@ -400,16 +557,28 @@ export default function PlayersPage() {
                       </td>
                     );
                   })}
+                  {show('bestMap') && (
                   <td className="table-cell">
-                    <BestMapCell bestMap={row.bestMap} />
+                    <BestMapCell
+                      bestMap={row.bestMap}
+                      to={row.bestMap && statsLink({ agent: row.agent, map: row.bestMap.map })}
+                      linkTitle={
+                        row.bestMap &&
+                        `Open team stats filtered to maps where ${selectedPlayer?.name} played ${row.agent} on ${row.bestMap.map}`
+                      }
+                    />
                   </td>
+                  )}
+                  {show('abilities') && (
                   <td className="table-cell">
                     {row.abilities ? (
-                      <AbilityUsageStrip agent={row.agent} usage={row.abilities} size={18} />
+                      <AbilityUsageStrip agent={row.agent} usage={row.abilities} size={14} grid />
                     ) : (
                       <span className="text-valorant-muted text-xs">—</span>
                     )}
                   </td>
+                  )}
+                  <td className="!border-l-0" />
                 </tr>
               ))}
             </tbody>
@@ -420,8 +589,121 @@ export default function PlayersPage() {
   );
 }
 
+/** Gear button in the table's header row: a checklist of every hideable
+ * column, in table order. Order never changes; columns can only be shown or
+ * hidden. The menu is fixed-positioned so the table's horizontal scroll
+ * container doesn't clip it. */
+function ColumnPicker({
+  hidden,
+  onToggle,
+  onShowAll,
+}: {
+  hidden: Set<string>;
+  onToggle: (key: string) => void;
+  onShowAll: () => void;
+}) {
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const open = pos !== null;
+
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setPos(null);
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (menuRef.current?.contains(t) || buttonRef.current?.contains(t)) return;
+      close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    // A fixed menu would drift away from the gear on scroll/resize; just close it.
+    const onScroll = (e: Event) => {
+      if (menuRef.current?.contains(e.target as Node)) return;
+      close();
+    };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [open]);
+
+  const toggleOpen = () => {
+    if (open) return setPos(null);
+    const r = buttonRef.current?.getBoundingClientRect();
+    if (r) setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+  };
+
+  const hiddenCount = TOGGLEABLE_COLUMNS.filter((c) => hidden.has(c.key)).length;
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={toggleOpen}
+        className={`relative inline-flex items-center justify-center w-6 h-6 rounded hover:text-white hover:bg-white/10 ${
+          hiddenCount > 0 || open ? 'text-white' : 'text-valorant-muted'
+        }`}
+        title={hiddenCount > 0 ? `Choose columns (${hiddenCount} hidden)` : 'Choose columns'}
+        aria-label="Choose columns"
+      >
+        <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4" aria-hidden="true">
+          <path
+            fillRule="evenodd"
+            d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
+            clipRule="evenodd"
+          />
+        </svg>
+        {hiddenCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-valorant-red" />
+        )}
+      </button>
+      {pos && (
+        <div
+          ref={menuRef}
+          className="fixed z-50 w-52 bg-valorant-panel border border-white/10 rounded-md shadow-lg py-1 max-h-96 overflow-y-auto normal-case tracking-normal font-normal text-left"
+          style={{ top: pos.top, right: pos.right }}
+        >
+          <button
+            type="button"
+            onClick={onShowAll}
+            disabled={hiddenCount === 0}
+            className="w-full text-left px-3 py-1.5 text-sm hover:bg-valorant-panel2 border-b border-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Show all
+          </button>
+          {TOGGLEABLE_COLUMNS.map((c) => (
+            <label
+              key={c.key}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-valorant-panel2"
+              title={c.tooltip}
+            >
+              <input
+                type="checkbox"
+                className="accent-valorant-red"
+                checked={!hidden.has(c.key)}
+                onChange={() => onToggle(c.key)}
+              />
+              {c.label}
+            </label>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 function SortHeader({
   label,
+  title,
   k,
   align,
   active,
@@ -429,6 +711,7 @@ function SortHeader({
   onClick,
 }: {
   label: string;
+  title?: string;
   k: SortKey;
   align?: 'left' | 'right';
   active: SortKey;
@@ -437,9 +720,9 @@ function SortHeader({
 }) {
   const isActive = active === k;
   const arrow = isActive ? (dir === 'asc' ? '▲' : '▼') : '';
-  const alignment = align === 'left' ? '' : 'text-right pr-5';
+  const alignment = align === 'left' ? '' : 'text-right';
   return (
-    <th className={`table-head ${alignment}`}>
+    <th className={`table-head ${alignment}`} title={title}>
       <button
         type="button"
         onClick={() => onClick(k)}
@@ -456,24 +739,30 @@ function SortHeader({
 
 function BestMapCell({
   bestMap,
+  to,
+  linkTitle,
 }: {
   bestMap: PlayerAggregate['bestMap'];
+  /** Stats page link for this map (see statsLink). */
+  to: To | null;
+  linkTitle: string | null;
 }) {
-  if (!bestMap) return <span className="text-valorant-muted text-xs">—</span>;
+  if (!bestMap || !to) return <span className="text-valorant-muted text-xs">—</span>;
   return (
-    <div
-      className="flex items-center gap-2"
-      title={`${isFinite(bestMap.avgVlr) ? `${bestMap.avgVlr.toFixed(2)} avg VLR · ` : ''}${bestMap.avgAcs.toFixed(0)} avg ACS over ${bestMap.games} ${bestMap.games === 1 ? 'game' : 'games'}`}
+    <Link
+      to={to}
+      className="flex items-center gap-2 hover:brightness-125"
+      title={`${linkTitle} · ${isFinite(bestMap.avgVlr) ? `${bestMap.avgVlr.toFixed(2)} avg VLR · ` : ''}${bestMap.avgAcs.toFixed(0)} avg ACS over ${bestMap.games} ${bestMap.games === 1 ? 'game' : 'games'}`}
     >
-      <MapIcon map={bestMap.map} width={40} height={22} />
       <div className="text-sm">
-        <div className="font-medium">{bestMap.map}</div>
+        <div className="font-medium" style={{ color: MAP_COLORS[bestMap.map] }}>
+          {bestMap.map}
+        </div>
         <div className="text-xs text-valorant-muted tabular-nums">
           {isFinite(bestMap.avgVlr) && <>{bestMap.avgVlr.toFixed(2)} VLR · </>}
-          {bestMap.avgAcs.toFixed(0)} ACS · {bestMap.games}{' '}
-          {bestMap.games === 1 ? 'game' : 'games'}
+          {bestMap.avgAcs.toFixed(0)} ACS
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

@@ -62,7 +62,8 @@ export default function StatsPage() {
     parseAsArrayOf(parseAsString).withDefault([])
   );
   // Not exposed in the filter bar UI — only ever set via the deep link from
-  // the Players page ("open this player's agent games on the stats page").
+  // the Players page ("open the maps this player played, optionally on one
+  // agent and/or map, on the stats page").
   const [playerFilter, setPlayerFilter] = useQueryState(
     'player',
     parseAsString.withDefault('')
@@ -109,12 +110,21 @@ export default function StatsPage() {
     setTab('overall');
   };
 
-  const filters: StatFilters = {
-    map: mapFilter ?? 'all',
-    agents: agentFilters,
-    playerId: playerFilter || undefined,
-    seriesId: seriesFilter || 'all',
-  };
+  // The date range is part of the shared filters (not just a pre-filter on
+  // the games list) so tabs that re-derive series or player stats from the
+  // roster-scoped games still respect it. Memoized so tabs with local state
+  // keyed off these (Examine closer's slider bounds) don't reset every render.
+  const filters: StatFilters = useMemo(
+    () => ({
+      map: mapFilter ?? 'all',
+      agents: agentFilters,
+      playerId: playerFilter || undefined,
+      seriesId: seriesFilter || 'all',
+      startDate: startDate ?? undefined,
+      endDate: endDate ?? undefined,
+    }),
+    [mapFilter, agentFilters, playerFilter, seriesFilter, startDate, endDate]
+  );
 
   const rosterSeriesIds = useMemo(() => {
     if (rosterFilter === ALL_ROSTERS) return null;
@@ -145,21 +155,9 @@ export default function StatsPage() {
     [allPlayers, rosterFilter]
   );
 
-  // Games narrowed to the selected date range first; all other filters and
-  // aggregates build on top of this so the range applies everywhere.
-  const dateScopedGames = useMemo(
-    () =>
-      rosterScopedGames.filter((g) => {
-        if (startDate && g.date < startDate) return false;
-        if (endDate && g.date > endDate) return false;
-        return true;
-      }),
-    [rosterScopedGames, startDate, endDate]
-  );
-
   const filteredGames = useMemo(
-    () => dateScopedGames.filter((g) => gameMatches(g, filters)),
-    [dateScopedGames, filters]
+    () => rosterScopedGames.filter((g) => gameMatches(g, filters)),
+    [rosterScopedGames, filters]
   );
 
   const totalGames = rosterScopedGames.length;

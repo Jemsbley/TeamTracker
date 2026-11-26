@@ -1,8 +1,9 @@
 import { MAPS } from '../constants';
-import type { Game, GameStat, Player, ValorantMap } from '../types';
+import type { Game, GameStat, Player, TradeCounts, ValorantMap } from '../types';
 import { aggregateAbilities, type AbilityUsage } from './abilities';
 import { effectiveScore } from './rounds';
 import { avgVlr } from './stats';
+import { sumTrades } from './trades';
 
 function gameWinForUs(g: Game): boolean | undefined {
   const sc = effectiveScore(g);
@@ -46,6 +47,8 @@ export type AgentStat = {
   avgVlr: number;
   /** Ability usage across every stat row using this agent; null if none recorded casts. */
   abilities: AbilityUsage | null;
+  /** Trade counts across stat rows on this agent that have them; null if none do. */
+  trades: TradeCounts | null;
   byMap: AgentMapStat[];
   bestPlayer: AgentBestPlayer | null;
   /** Top 2 partners by win rate when played alongside this agent. */
@@ -181,6 +184,7 @@ export function computeAgentStats(
       avgAcs,
       avgVlr: avgVlr(agentStats),
       abilities: aggregateAbilities(agentStats.map((s) => s.abilities)),
+      trades: sumTrades(agentStats),
       byMap,
       bestPlayer,
       topPartners,

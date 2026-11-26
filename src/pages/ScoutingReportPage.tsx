@@ -47,6 +47,7 @@ import {
   parseTagList,
   isLegacyReport,
   scoutGames,
+  scoutKey,
   scoutMapRows,
   scoutPlayers,
   scoutSince,
@@ -54,6 +55,7 @@ import {
   trackerCustomsUrl,
   visibleScoutMatches,
 } from '../utils/scouting';
+import { TRADE_RATE_KEYS, TRADE_STAT_INFO, tradeFraction } from '../utils/trades';
 
 // The markdown renderer is sizable and only used here, so it loads on demand
 // instead of in the app's main bundle.
@@ -442,6 +444,13 @@ function ScoutResults({ report }: { report: ScoutingReport }) {
     'map',
     parseAsStringEnum<ValorantMap>([...MAPS])
   );
+  // Scoreboard player picked to narrow the heatmap. Only applies while a map
+  // is selected, and is cleared whenever the map changes.
+  const [heatPlayer, setHeatPlayer] = useQueryState('hplayer', parseAsString);
+  const pickMap = (map: ValorantMap | null) => {
+    setMapFilter(map);
+    setHeatPlayer(null);
+  };
   const visible = useMemo(() => visibleScoutMatches(report), [report]);
   // Everything but the maps table narrows to the selected map; the table keeps
   // every map so you can switch between them.
@@ -495,9 +504,28 @@ function ScoutResults({ report }: { report: ScoutingReport }) {
           lowerIsBetter
         />
         <RateTile label="Retake W%" wins={eco.defense.retakeWins} total={eco.defense.plantsAllowed} />
+        {TRADE_RATE_KEYS.map((key) => {
+          const [n, d] = tradeFraction(eco.trades, key);
+          return (
+            <RateTile
+              key={key}
+              label={TRADE_STAT_INFO[key].label}
+              wins={n}
+              total={d}
+              lowerIsBetter={TRADE_STAT_INFO[key].lowerIsBetter}
+            />
+          );
+        })}
       </div>
 
-      <PlayerStatsTable games={games} players={players} filters={{}} includeSubs />
+      <PlayerStatsTable
+        games={games}
+        players={players}
+        filters={{}}
+        includeSubs
+        onSelectPlayer={mapFilter ? setHeatPlayer : undefined}
+        selectedPlayerId={mapFilter ? heatPlayer : null}
+      />
 
       {/* On wide screens both boxes share the map table's height, which is
           at least ten rows (32px header + 10 × 41px rows): the heatmap card's
@@ -513,7 +541,7 @@ function ScoutResults({ report }: { report: ScoutingReport }) {
                   Map
                   <button
                     type="button"
-                    onClick={() => setMapFilter(null)}
+                    onClick={() => pickMap(null)}
                     className={
                       mapFilter ? 'text-valorant-muted hover:text-yellow-300' : 'text-yellow-300'
                     }
@@ -532,7 +560,7 @@ function ScoutResults({ report }: { report: ScoutingReport }) {
             {mapRows.map((row) => (
               <tr
                 key={row.map}
-                onClick={() => setMapFilter(mapFilter === row.map ? null : row.map)}
+                onClick={() => pickMap(mapFilter === row.map ? null : row.map)}
                 className={`border-t border-white/5 cursor-pointer transition-colors ${
                   mapFilter === row.map ? 'bg-valorant-panel2/50' : 'hover:bg-valorant-panel2/30'
                 }`}
@@ -579,7 +607,7 @@ function ScoutResults({ report }: { report: ScoutingReport }) {
       <div className="card w-full lg:flex-1 lg:min-w-0 lg:relative">
         <div className="lg:absolute lg:inset-0 lg:p-4 flex flex-col">
           {mapFilter ? (
-            <ScoutHeatmap map={mapFilter} matches={onMap} />
+            <ScoutHeatmap map={mapFilter} matches={onMap} player={heatPlayer} />
           ) : (
             <BlurredPrompt text="Click on a map to see its heatmap" blurClass="blur-md" clip>
               <HeatmapView
@@ -691,7 +719,16 @@ const PLANTS: { key: PlantFilter; label: string }[] = [
 
 /** A trimmed-down version of the Heatmap page for one map of the scouted
  * team: their kills (green) and deaths (red), filtered by side and spike. */
-function ScoutHeatmap({ map, matches }: { map: ValorantMap; matches: ScoutMatch[] }) {
+function ScoutHeatmap({
+  map,
+  matches,
+  player,
+}: {
+  map: ValorantMap;
+  matches: ScoutMatch[];
+  /** scoutKey of a scoreboard player to show only their engagements. */
+  player: string | null;
+}) {
   const [side, setSide] = useQueryState(
     'hside',
     parseAsStringEnum<SideFilter>(['both', 'attack', 'defense']).withDefault('both')
@@ -731,6 +768,7 @@ function ScoutHeatmap({ map, matches }: { map: ValorantMap; matches: ScoutMatch[
   const filtered = useMemo(
     () =>
       events.filter((e) => {
+        if (player && scoutKey(e.player) !== player) return false;
         if (side === 'attack' && e.side !== 'attacker') return false;
         if (side === 'defense' && e.side !== 'defender') return false;
         if (plant === 'pre' && e.afterPlant) return false;
@@ -741,7 +779,7 @@ function ScoutHeatmap({ map, matches }: { map: ValorantMap; matches: ScoutMatch[
         return true;
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [events, side, plant, activeSites.join(), timeStart, timeEnd]
+    [events, player, side, plant, activeSites.join(), timeStart, timeEnd]
   );
   const playerNames = useMemo(() => {
     const out = new Map<string, string>();

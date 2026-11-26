@@ -6,6 +6,8 @@ type Props = {
   /** One map: the ultimate shows its cast count rather than a per-map average. */
   single?: boolean;
   size?: number;
+  /** Two rows of two (C Q / E X) in small text, for tight table cells. */
+  grid?: boolean;
 };
 
 /**
@@ -13,9 +15,15 @@ type Props = {
  * the basic abilities, casts per map (or the raw count on a single map) for
  * the ultimate. Exact counts are in each icon's tooltip.
  */
-export default function AbilityUsageStrip({ agent, usage, single, size = 20 }: Props) {
+export default function AbilityUsageStrip({ agent, usage, single, size = 20, grid }: Props) {
   return (
-    <div className="inline-flex items-center gap-2.5 whitespace-nowrap">
+    <div
+      className={
+        grid
+          ? 'inline-grid grid-cols-2 gap-x-2 gap-y-0.5 whitespace-nowrap text-[11px] leading-tight'
+          : 'inline-flex items-center gap-2.5 whitespace-nowrap'
+      }
+    >
       {ABILITY_SLOTS.map((slot) => {
         const isUlt = slot === 'x';
         const name = abilityName(agent, slot);
@@ -31,7 +39,7 @@ export default function AbilityUsageStrip({ agent, usage, single, size = 20 }: P
           <span
             key={slot}
             className={`inline-flex items-center gap-1 tabular-nums ${
-              isUlt ? 'pl-2.5 border-l border-white/10' : ''
+              isUlt && !grid ? 'pl-2.5 border-l border-white/10' : ''
             }`}
             title={title}
           >

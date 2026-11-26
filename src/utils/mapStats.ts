@@ -1,7 +1,8 @@
 import { MAPS } from '../constants';
-import type { Game, Series, ValorantMap } from '../types';
+import type { Game, Series, TradeCounts, ValorantMap } from '../types';
 import { PICKBAN_STEPS, isUs } from './pickBan';
-import { effectiveScore, sideOfRound } from './rounds';
+import { effectiveScore, roundsPlayedIn, sideOfRound } from './rounds';
+import { ZERO_TRADES, addTrades, sumTrades } from './trades';
 
 function gameWinForUs(g: Game): boolean | undefined {
   const sc = effectiveScore(g);
@@ -93,6 +94,13 @@ export type MapAggregate = {
   /** Sum and count of VLR ratings, over stat lines that have one. */
   vlrSum: number;
   vlrCount: number;
+  /** Our team's first kills / first deaths, and the rounds they're out of
+   * (only maps with stat lines count toward the rounds). */
+  firstKills: number;
+  firstDeaths: number;
+  openingRounds: number;
+  /** Team trade counts over maps with trade data (tracker imports). */
+  trades: TradeCounts;
   topComp: AgentComp | null;
 };
 
@@ -129,6 +137,10 @@ export function computeMapAggregates(
       acsCount: 0,
       vlrSum: 0,
       vlrCount: 0,
+      firstKills: 0,
+      firstDeaths: 0,
+      openingRounds: 0,
+      trades: { ...ZERO_TRADES },
       topComp: null,
     };
   }
@@ -208,6 +220,17 @@ export function computeMapAggregates(
         bucket.total += 1;
         if (r.result === 'W') bucket.wins += 1;
       }
+    }
+
+    // Openings (FB% / FD%) and trades
+    if (g.stats.length > 0) {
+      agg.openingRounds += roundsPlayedIn(g);
+      for (const stat of g.stats) {
+        agg.firstKills += stat.firstKills;
+        agg.firstDeaths += stat.firstDeaths;
+      }
+      const t = sumTrades(g.stats);
+      if (t) agg.trades = addTrades(agg.trades, t);
     }
 
     // ACS

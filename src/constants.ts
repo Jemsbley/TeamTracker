@@ -16,6 +16,24 @@ export const MAPS: ValorantMap[] = [
   'Sunset',
 ];
 
+/** A pastel text color per map, chosen to evoke each map and stay readable
+ * on the dark background. */
+export const MAP_COLORS: Record<ValorantMap, string> = {
+  Abyss: '#93A4BC', // dull blue
+  Ascent: '#F4A6A6', // light red
+  Bind: '#DDB088', // dusty orange
+  Breeze: '#A4B6F2', // warm blue
+  Corrode: '#CF9583', // dusty copperish red
+  Fracture: '#7FB08C', // deep green
+  Haven: '#D3F2CD', // very light green
+  Icebox: '#C3EAF7', // icy blue
+  Lotus: '#A8D98E', // leafy green
+  Pearl: '#6F9FD3', // deep ocean blue
+  Split: '#C2A383', // brown
+  Summit: '#9CCFC9', // cold greenish blue
+  Sunset: '#EC8679', // deep sunset red
+};
+
 /** Bomb sites per map — Haven and Lotus have a C site, everything else is
  * A/B. */
 export const MAP_SITES: Record<ValorantMap, string[]> = Object.fromEntries(
