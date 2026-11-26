@@ -1,4 +1,5 @@
-import type { Game, Round, Side } from '../types';
+import type { Game, Round, Side, TradeCounts } from '../types';
+import { ZERO_TRADES, addTrades, sumTrades } from './trades';
 
 export const HALF_LENGTH = 12;
 
@@ -131,6 +132,9 @@ export type RoundEconomy = {
   /** Total played rounds (any category) */
   total: number;
   totalWins: number;
+  /** Team trade counts, summed from the stat lines that have them (tracker
+   * imports only; all zero otherwise). See utils/trades.ts. */
+  trades: TradeCounts;
 };
 
 const blank = (): RoundEconomy => ({
@@ -150,10 +154,12 @@ const blank = (): RoundEconomy => ({
   defense: { rounds: 0, plantsAllowed: 0, retakeWins: 0 },
   total: 0,
   totalWins: 0,
+  trades: { ...ZERO_TRADES },
 });
 
 export function gameEconomy(game: Game): RoundEconomy {
   const eco = blank();
+  eco.trades = sumTrades(game.stats) ?? { ...ZERO_TRADES };
   const rounds = game.rounds ?? [];
   const startingSide = game.startingSide;
   for (let i = 0; i < rounds.length; i++) {
@@ -250,6 +256,7 @@ export function mergeEconomy(a: RoundEconomy, b: RoundEconomy): RoundEconomy {
   };
   out.total = a.total + b.total;
   out.totalWins = a.totalWins + b.totalWins;
+  out.trades = addTrades(a.trades, b.trades);
   return out;
 }
 

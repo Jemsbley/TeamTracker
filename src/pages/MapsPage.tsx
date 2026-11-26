@@ -7,6 +7,7 @@ import {
   useQueryState,
 } from 'nuqs';
 import AgentIcon from '../components/AgentIcon';
+import { useTableCrosshair } from '../components/useTableCrosshair';
 import DateRangePicker from '../components/DateRangePicker';
 import GettingStarted from '../components/GettingStarted';
 import MapIcon from '../components/MapIcon';
@@ -15,6 +16,7 @@ import PageHeader from '../components/PageHeader';
 import { useStore } from '../store';
 import { ALL_ROSTERS, resolveRosterFilter } from '../utils/rosters';
 import { computeMapAggregates, type MapAggregate } from '../utils/mapStats';
+import { TRADE_STAT_INFO } from '../utils/trades';
 
 function pct(wins: number, total: number, digits = 0): string {
   if (!total) return '–';
@@ -37,6 +39,10 @@ type SortKey =
   | 'defPistol'
   | 'atkRound'
   | 'defRound'
+  | 'fbRate'
+  | 'fdRate'
+  | 'killTrade'
+  | 'deathTrade'
   | 'topComp'
   | 'avgVlr'
   | 'avgAcs';
@@ -53,6 +59,10 @@ const SORT_KEYS: SortKey[] = [
   'defPistol',
   'atkRound',
   'defRound',
+  'fbRate',
+  'fdRate',
+  'killTrade',
+  'deathTrade',
   'topComp',
   'avgVlr',
   'avgAcs',
@@ -89,6 +99,14 @@ function getSortValue(
       return rate(m.attackRounds.wins, m.attackRounds.total);
     case 'defRound':
       return rate(m.defenseRounds.wins, m.defenseRounds.total);
+    case 'fbRate':
+      return rate(m.firstKills, m.openingRounds);
+    case 'fdRate':
+      return rate(m.firstDeaths, m.openingRounds);
+    case 'killTrade':
+      return rate(m.trades.killsTraded, m.trades.kills);
+    case 'deathTrade':
+      return rate(m.trades.deathsTraded, m.trades.deaths);
     case 'topComp':
       return m.topComp ? m.topComp.wins / m.topComp.total : undefined;
     case 'avgVlr':
@@ -165,19 +183,23 @@ export default function MapsPage() {
     [rosterScopedSeries, seriesFilter, startDate, endDate]
   );
 
-  // Games feeding play/round stats: within the scoped series, then narrowed by
-  // the selected agents (a game must include every selected agent).
+  // Games feeding play/round stats: roster + selected series, the date range
+  // checked against each game's own date (like the Stats and Players pages),
+  // then narrowed by the selected agents (a game must include every one).
   const scopedGames = useMemo(() => {
-    const ids = new Set(scopedSeries.map((s) => s.id));
+    const ids = new Set(rosterScopedSeries.map((s) => s.id));
     return games.filter((g) => {
       if (!ids.has(g.seriesId)) return false;
+      if (seriesFilter && g.seriesId !== seriesFilter) return false;
+      if (startDate && g.date < startDate) return false;
+      if (endDate && g.date > endDate) return false;
       if (agentFilters.length > 0) {
         const gameAgents = new Set(g.stats.map((s) => s.agent));
         if (!agentFilters.every((a) => gameAgents.has(a))) return false;
       }
       return true;
     });
-  }, [games, scopedSeries, agentFilters]);
+  }, [games, rosterScopedSeries, seriesFilter, startDate, endDate, agentFilters]);
 
   const aggregates = useMemo(
     () => computeMapAggregates(scopedSeries, scopedGames),
@@ -228,6 +250,7 @@ export default function MapsPage() {
   }, [aggregates, sortKey, sortDir]);
 
   const totalGames = scopedGames.length;
+  const crosshair = useTableCrosshair();
 
   if (rosters.length === 0 || series.length === 0) {
     return <GettingStarted hasRoster={rosters.length > 0} />;
@@ -316,7 +339,11 @@ export default function MapsPage() {
         </div>
       ) : (
         <div className="card overflow-x-auto p-0">
-          <table className="w-full min-w-[1200px]">
+          {crosshair.style}
+          <table
+            onMouseOver={crosshair.tableProps.onMouseOver}
+            onMouseLeave={crosshair.tableProps.onMouseLeave}
+            className={`${crosshair.tableProps.className} w-full min-w-[1150px] [&_td+td]:border-l [&_th+th]:border-l [&_td]:border-white/5 [&_th]:border-white/5`}>
             <thead className="bg-valorant-panel2/40">
               <tr>
                 <SortHeader
@@ -363,6 +390,20 @@ export default function MapsPage() {
                   onClick={handleSort}
                 />
                 <SortHeader
+                  label="Avg VLR"
+                  k="avgVlr"
+                  active={sortKey}
+                  dir={sortDir}
+                  onClick={handleSort}
+                />
+                <SortHeader
+                  label="Avg ACS"
+                  k="avgAcs"
+                  active={sortKey}
+                  dir={sortDir}
+                  onClick={handleSort}
+                />
+                <SortHeader
                   label="Atk Round"
                   k="atkRound"
                   active={sortKey}
@@ -391,23 +432,41 @@ export default function MapsPage() {
                   onClick={handleSort}
                 />
                 <SortHeader
+                  label="FB%"
+                  k="fbRate"
+                  title="Rounds where we got the first kill"
+                  active={sortKey}
+                  dir={sortDir}
+                  onClick={handleSort}
+                />
+                <SortHeader
+                  label="FD%"
+                  k="fdRate"
+                  title="Rounds where we died first"
+                  active={sortKey}
+                  dir={sortDir}
+                  onClick={handleSort}
+                />
+                <SortHeader
+                  label={TRADE_STAT_INFO.killTrade.short}
+                  k="killTrade"
+                  title={`${TRADE_STAT_INFO.killTrade.label}: ${TRADE_STAT_INFO.killTrade.tooltip} (tracker.gg imports only)`}
+                  active={sortKey}
+                  dir={sortDir}
+                  onClick={handleSort}
+                />
+                <SortHeader
+                  label={TRADE_STAT_INFO.deathTrade.short}
+                  k="deathTrade"
+                  title={`${TRADE_STAT_INFO.deathTrade.label}: ${TRADE_STAT_INFO.deathTrade.tooltip} (tracker.gg imports only)`}
+                  active={sortKey}
+                  dir={sortDir}
+                  onClick={handleSort}
+                />
+                <SortHeader
                   label="Top Comp"
                   k="topComp"
                   align="left"
-                  active={sortKey}
-                  dir={sortDir}
-                  onClick={handleSort}
-                />
-                <SortHeader
-                  label="Avg VLR"
-                  k="avgVlr"
-                  active={sortKey}
-                  dir={sortDir}
-                  onClick={handleSort}
-                />
-                <SortHeader
-                  label="Avg ACS"
-                  k="avgAcs"
                   active={sortKey}
                   dir={sortDir}
                   onClick={handleSort}
@@ -434,7 +493,9 @@ export default function MapsPage() {
         <p>
           Pick% = our picks of this map ÷ all our picks. Ban% = series where we banned this map ÷
           all series with recorded bans by us. Opp Ban% = series where the
-          opponent banned this map ÷ all series with recorded opponent bans. Top Comp = the 5-agent composition with the highest win
+          opponent banned this map ÷ all series with recorded opponent bans. FB% / FD% = rounds where we got the first kill / died first.
+          K Tr% = our kills the enemy traded back within 5s; D Tr% = our deaths a teammate traded within 5s (tracker.gg imports only).
+          Top Comp = the 5-agent composition with the highest win
           rate (ties broken by play count).
         </p>
       </div>
@@ -444,6 +505,7 @@ export default function MapsPage() {
 
 function SortHeader({
   label,
+  title,
   k,
   align,
   active,
@@ -451,6 +513,7 @@ function SortHeader({
   onClick,
 }: {
   label: string;
+  title?: string;
   k: SortKey;
   align?: 'left' | 'right';
   active: SortKey;
@@ -459,9 +522,9 @@ function SortHeader({
 }) {
   const isActive = active === k;
   const arrow = isActive ? (dir === 'asc' ? '▲' : '▼') : '';
-  const alignment = align === 'left' ? '' : 'text-right pr-5';
+  const alignment = align === 'left' ? '' : 'text-right pr-4';
   return (
-    <th className={`table-head ${alignment}`}>
+    <th className={`table-head ${alignment}`} title={title}>
       <button
         type="button"
         onClick={() => onClick(k)}
@@ -495,7 +558,7 @@ function MapRow({
   return (
     <tr
       onClick={onClick}
-      className="border-t border-white/5 cursor-pointer hover:bg-valorant-panel2/30 transition-colors"
+      className="border-t border-white/5 cursor-pointer"
       title="Click to view this map in Stats"
     >
       <td className="table-cell">
@@ -504,44 +567,74 @@ function MapRow({
           <span className="font-medium">{m.map}</span>
         </div>
       </td>
-      <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
+      <td className={`table-cell text-right pr-4 tabular-nums ${dim}`}>
         {m.plays}
       </td>
-      <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
+      <td className={`table-cell text-right pr-4 tabular-nums ${dim}`}>
         {m.plays === 0 ? '—' : `${m.wins}-${m.losses}`}
       </td>
-      <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
+      <td className={`table-cell text-right pr-4 tabular-nums ${dim}`}>
         {ratePct(m.ourPickCount, ourPickTotal)}
       </td>
-      <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
+      <td className={`table-cell text-right pr-4 tabular-nums ${dim}`}>
         {ratePct(m.ourBanCount, ourBanSeriesTotal)}
       </td>
-      <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
+      <td className={`table-cell text-right pr-4 tabular-nums ${dim}`}>
         {ratePct(m.enemyBanCount, enemyBanSeriesTotal)}
       </td>
-      <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
-        {pct(m.attackRounds.wins, m.attackRounds.total)}{' '}
-        <span className="text-xs text-valorant-muted">
-          ({m.attackRounds.wins}/{m.attackRounds.total})
-        </span>
+      <td className={`table-cell text-right pr-4 tabular-nums ${dim}`}>
+        {avgVlr !== undefined ? avgVlr.toFixed(2) : '—'}
       </td>
-      <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
-        {pct(m.defenseRounds.wins, m.defenseRounds.total)}{' '}
-        <span className="text-xs text-valorant-muted">
-          ({m.defenseRounds.wins}/{m.defenseRounds.total})
-        </span>
+      <td className={`table-cell text-right pr-4 tabular-nums ${dim}`}>
+        {avgAcs > 0 ? avgAcs.toFixed(0) : '—'}
       </td>
-      <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
-        {pct(m.attackPistol.wins, m.attackPistol.total)}{' '}
-        <span className="text-xs text-valorant-muted">
-          ({m.attackPistol.wins}/{m.attackPistol.total})
-        </span>
+      <td
+        className={`table-cell text-right pr-4 tabular-nums ${dim}`}
+        title={`${m.attackRounds.wins}/${m.attackRounds.total}`}
+      >
+        {pct(m.attackRounds.wins, m.attackRounds.total)}
       </td>
-      <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
-        {pct(m.defensePistol.wins, m.defensePistol.total)}{' '}
-        <span className="text-xs text-valorant-muted">
-          ({m.defensePistol.wins}/{m.defensePistol.total})
-        </span>
+      <td
+        className={`table-cell text-right pr-4 tabular-nums ${dim}`}
+        title={`${m.defenseRounds.wins}/${m.defenseRounds.total}`}
+      >
+        {pct(m.defenseRounds.wins, m.defenseRounds.total)}
+      </td>
+      <td
+        className={`table-cell text-right pr-4 tabular-nums ${dim}`}
+        title={`${m.attackPistol.wins}/${m.attackPistol.total}`}
+      >
+        {pct(m.attackPistol.wins, m.attackPistol.total)}
+      </td>
+      <td
+        className={`table-cell text-right pr-4 tabular-nums ${dim}`}
+        title={`${m.defensePistol.wins}/${m.defensePistol.total}`}
+      >
+        {pct(m.defensePistol.wins, m.defensePistol.total)}
+      </td>
+      <td
+        className={`table-cell text-right pr-4 tabular-nums ${dim}`}
+        title={`${m.firstKills}/${m.openingRounds}`}
+      >
+        {ratePct(m.firstKills, m.openingRounds)}
+      </td>
+      <td
+        className={`table-cell text-right pr-4 tabular-nums ${dim}`}
+        title={`${m.firstDeaths}/${m.openingRounds}`}
+      >
+        {ratePct(m.firstDeaths, m.openingRounds)}
+      </td>
+      <td
+        className={`table-cell text-right pr-4 tabular-nums ${dim}`}
+        title={`${m.trades.killsTraded}/${m.trades.kills}`}
+      >
+        {ratePct(m.trades.killsTraded, m.trades.kills)}
+      </td>
+      <td
+        className={`table-cell text-right pr-4 tabular-nums ${dim}`}
+        title={`${m.trades.deathsTraded}/${m.trades.deaths}`}
+      >
+        {ratePct(m.trades.deathsTraded, m.trades.deaths)}
       </td>
       <td className="table-cell">
         {m.topComp ? (
@@ -553,19 +646,12 @@ function MapRow({
               <AgentIcon key={a} agent={a} size={20} />
             ))}
             <span className="ml-1 text-xs text-valorant-muted tabular-nums">
-              {pct(m.topComp.wins, m.topComp.total)} ({m.topComp.wins}/
-              {m.topComp.total})
+              {pct(m.topComp.wins, m.topComp.total)}
             </span>
           </div>
         ) : (
           <span className="text-valorant-muted text-xs">—</span>
         )}
-      </td>
-      <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
-        {avgVlr !== undefined ? avgVlr.toFixed(2) : '—'}
-      </td>
-      <td className={`table-cell text-right pr-5 tabular-nums ${dim}`}>
-        {avgAcs > 0 ? avgAcs.toFixed(0) : '—'}
       </td>
     </tr>
   );

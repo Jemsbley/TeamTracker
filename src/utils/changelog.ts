@@ -23,6 +23,17 @@ export function formatReleaseDate(iso: string): string {
 // Newest first.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.4.1',
+    date: '2026-11-26',
+    title: 'Trade stats, filter fixes, scouting heatmap by player',
+    changes: [
+      'New trade stats from tracker.gg imports (traded within 5s): FD traded%, FB traded%, Death trade% and Kill trade%. Find them in Engagements, scoreboards, the Players, Maps and Agents tabs, Examine closer, Progression and scouting reports',
+      'Players tab: hover headers for stat descriptions, hide columns with the gear, click a Best map to open those games in Stats, plus a Reset filters button and a cleaner layout',
+      'Scouting reports: with a map picked, click a player on the scoreboard to see only their kills and deaths on the heatmap',
+      'Filters fixed: the date range now applies to everything on the Stats, Agents and Maps tabs, and scoreboards only show players who played in the filtered maps',
+    ],
+  },
+  {
     version: '1.4.0',
     date: '2026-11-24',
     title: 'Scouting rework, VLR rating, ability usage, Hush',

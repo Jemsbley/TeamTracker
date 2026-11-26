@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { parseAsArrayOf, parseAsString, useQueryState } from 'nuqs';
 import { aggregateEconomy, pct, type RoundEconomy } from '../../utils/rounds';
 import type { Game } from '../../types';
+import { TRADE_RATE_KEYS, TRADE_STAT_INFO, tradeFraction } from '../../utils/trades';
 
 type Props = {
   filteredGames: Game[];
@@ -38,6 +39,16 @@ const STAT_DEFS: StatDef[] = [
   { key: 'postplant', label: 'Postplant W%', get: (e) => ({ wins: e.attack.postplantWins, total: e.attack.plants }) },
   { key: 'plantAllowed', label: 'Plant allowed', get: (e) => ({ wins: e.defense.plantsAllowed, total: e.defense.rounds }) },
   { key: 'retake', label: 'Retake W%', get: (e) => ({ wins: e.defense.retakeWins, total: e.defense.plantsAllowed }) },
+  ...TRADE_RATE_KEYS.map(
+    (key): StatDef => ({
+      key,
+      label: TRADE_STAT_INFO[key].label,
+      get: (e) => {
+        const [wins, total] = tradeFraction(e.trades, key);
+        return { wins, total };
+      },
+    })
+  ),
 ];
 
 /** The primary stat uses the brand red; up to four comparison stats cycle

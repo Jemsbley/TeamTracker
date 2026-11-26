@@ -128,6 +128,10 @@ export default function SeriesListPage() {
   const sorted = [...filteredSeries].sort((a, b) =>
     b.date.localeCompare(a.date)
   );
+  const filteredSeriesIds = new Set(filteredSeries.map((s) => s.id));
+  const filteredGameCount = games.filter((g) =>
+    filteredSeriesIds.has(g.seriesId)
+  ).length;
   const rosterById = (id: string) =>
     rosters.find((r) => r.id === id)?.name ?? '?';
 
@@ -142,7 +146,7 @@ export default function SeriesListPage() {
       <PageHeader
         title="Series"
         titleGrow={false}
-        description={`${series.length} series · ${games.length} games tracked`}
+        description={`${filteredSeries.length} series · ${filteredGameCount} games tracked`}
       >
         {rosters.length > 1 && (
           <div className="flex items-end gap-3">

@@ -248,6 +248,7 @@ export function parseTrackerMatch(root: unknown): TrackerImportResult {
       multikills,
       ...(derived?.vlrRating != null ? { vlrRating: derived.vlrRating } : {}),
       ...(derived?.abilities ? { abilities: derived.abilities } : {}),
+      ...(derived ? { trades: derived.trades } : {}),
     };
     return { identifier, name, team, agent, stat };
   });

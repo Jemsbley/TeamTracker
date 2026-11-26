@@ -19,6 +19,7 @@ import { AGENTS_BY_CLASS, AGENT_CLASS, CLASS_COLOR, CLASS_LABEL, MAPS } from '..
 import { useStore } from '../store';
 import { ALL_ROSTERS, resolveRosterFilter } from '../utils/rosters';
 import { computeAgentStats, type AgentStat } from '../utils/agentStats';
+import { TRADE_RATE_KEYS, TRADE_STAT_INFO, tradeFraction } from '../utils/trades';
 import { rateColor } from '../utils/color';
 import type { AgentClass, ValorantMap } from '../types';
 
@@ -73,25 +74,20 @@ export default function AgentsPage() {
     [series, rosterFilter]
   );
 
-  // Series narrowed by roster + selected series + date range.
-  const scopedSeries = useMemo(
-    () =>
-      rosterScopedSeries.filter((s) => {
-        if (seriesFilter && s.id !== seriesFilter) return false;
-        if (startDate && s.date < startDate) return false;
-        if (endDate && s.date > endDate) return false;
-        return true;
-      }),
-    [rosterScopedSeries, seriesFilter, startDate, endDate]
-  );
+  // Games narrowed by roster + selected series + map, with the date range
+  // checked against each game's own date (like the Stats and Players pages),
+  // not its series' date.
   const scopedGames = useMemo(() => {
-    const ids = new Set(scopedSeries.map((s) => s.id));
+    const ids = new Set(rosterScopedSeries.map((s) => s.id));
     return games.filter((g) => {
       if (!ids.has(g.seriesId)) return false;
+      if (seriesFilter && g.seriesId !== seriesFilter) return false;
+      if (startDate && g.date < startDate) return false;
+      if (endDate && g.date > endDate) return false;
       if (mapFilter && g.map !== mapFilter) return false;
       return true;
     });
-  }, [games, scopedSeries, mapFilter]);
+  }, [games, rosterScopedSeries, seriesFilter, startDate, endDate, mapFilter]);
   const scopedPlayers = useMemo(
     () =>
       rosterFilter === ALL_ROSTERS
@@ -605,6 +601,30 @@ function AgentDetailRow({ a }: { a: AgentStat }) {
           </div>
           <div className="mt-1 text-sm">
             <AbilityUsageStrip agent={a.agent} usage={a.abilities} size={24} />
+          </div>
+        </div>
+      )}
+      {a.trades && (
+        <div className="pt-2 border-t border-white/5">
+          <div className="text-sm font-semibold uppercase tracking-wide text-valorant-muted">
+            Trades{' '}
+            <span className="normal-case font-normal text-xs">(within 5s)</span>
+          </div>
+          <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+            {TRADE_RATE_KEYS.map((key) => {
+              const info = TRADE_STAT_INFO[key];
+              const [n, d] = tradeFraction(a.trades, key);
+              return (
+                <span
+                  key={key}
+                  className="whitespace-nowrap"
+                  title={`${info.tooltip}: ${n} / ${d}`}
+                >
+                  <span className="text-valorant-muted">{info.label}</span>{' '}
+                  <span className="text-valorant-accent tabular-nums">{pct(n, d)}</span>
+                </span>
+              );
+            })}
           </div>
         </div>
       )}

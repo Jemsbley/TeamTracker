@@ -151,6 +151,23 @@ export type GameStat = {
   vlrRating?: number;
   /** Ability casts on this map. Derived from rawJson like vlrRating; never stored. */
   abilities?: AbilityCasts;
+  /** Trade counts from the kill timeline (see utils/trades.ts). Derived from
+   * rawJson like vlrRating; never stored. */
+  trades?: TradeCounts;
+};
+
+/** One player's kills/deaths on a map and how many were traded within 5s.
+ * `killsTraded` = our kills the enemy traded back; `deathsTraded` = our
+ * deaths a teammate traded. First kills/deaths are each round's opener. */
+export type TradeCounts = {
+  kills: number;
+  killsTraded: number;
+  deaths: number;
+  deathsTraded: number;
+  firstKills: number;
+  firstKillsTraded: number;
+  firstDeaths: number;
+  firstDeathsTraded: number;
 };
 
 /** Total casts per ability slot on one map (C/Q/E/X keybinds), plus the
@@ -216,8 +233,9 @@ export type ScoutMatch = {
   rounds: Round[];
   /**
    * The scouted team's five stat lines. `playerId` is the lowercased Riot ID.
-   * Unlike Game stats, vlrRating and abilities are stored here, since there is
-   * no rawJson to derive them from later.
+   * Unlike Game stats, vlrRating, abilities and trades are stored here, since
+   * there is no rawJson to derive them from later. (Older uploads without
+   * trades get them from the heatmap points instead; see scoutGames.)
    */
   stats: GameStat[];
   /** Riot ID as tracker.gg displays it, keyed by playerId. */

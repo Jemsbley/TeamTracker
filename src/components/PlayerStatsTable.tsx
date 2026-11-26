@@ -9,6 +9,7 @@ import {
   type Aggregate,
   type StatFilters,
 } from '../utils/stats';
+import { TRADE_STAT_INFO } from '../utils/trades';
 
 type Col = {
   key: keyof Aggregate | 'name';
@@ -22,6 +23,8 @@ type Col = {
   signed?: boolean;
   /** Lower-is-better stats (e.g. first deaths). */
   bestIsLow?: boolean;
+  /** Header hover text. */
+  tooltip?: string;
 };
 
 const COLUMNS: Col[] = [
@@ -37,6 +40,23 @@ const COLUMNS: Col[] = [
   { key: 'firstKills', label: 'FK', digits: 1 },
   { key: 'firstDeaths', label: 'FD', digits: 1, bestIsLow: true },
   { key: 'multikills', label: 'MK', digits: 1 },
+  ...(
+    [
+      ['fdTradedPct', TRADE_STAT_INFO.fdTraded],
+      ['fbTradedPct', TRADE_STAT_INFO.fbTraded],
+      ['deathTradePct', TRADE_STAT_INFO.deathTrade],
+      ['killTradePct', TRADE_STAT_INFO.killTrade],
+    ] as const
+  ).map(
+    ([key, info]): Col => ({
+      key,
+      label: info.short,
+      digits: 0,
+      pct: true,
+      bestIsLow: info.lowerIsBetter,
+      tooltip: `${info.label}: ${info.tooltip} (tracker.gg imports only)`,
+    })
+  ),
 ];
 
 function fmtValue(col: Col, v: number): string {
@@ -56,6 +76,13 @@ type Props = {
    * cell is subscripted with its difference from the baseline aggregate.
    */
   compareGames?: Game[];
+  /**
+   * Makes player rows selectable: the Player header gets an "Any" button that
+   * clears the selection, and clicking a row (with games) selects it, or
+   * clears it if it's already selected.
+   */
+  onSelectPlayer?: (playerId: string | null) => void;
+  selectedPlayerId?: string | null;
 };
 
 export default function PlayerStatsTable({
@@ -64,6 +91,8 @@ export default function PlayerStatsTable({
   filters,
   includeSubs,
   compareGames,
+  onSelectPlayer,
+  selectedPlayerId,
 }: Props) {
   const team = useMemo(() => aggregateTeam(games, filters), [games, filters]);
   const teamCmp = useMemo(
@@ -80,12 +109,9 @@ export default function PlayerStatsTable({
           ? aggregateForPlayer(compareGames, p.id, filters)
           : null,
       }))
-      .sort((a, b) => {
-        if ((a.agg.games > 0) !== (b.agg.games > 0)) {
-          return a.agg.games > 0 ? -1 : 1;
-        }
-        return b.agg.acs - a.agg.acs;
-      });
+      // Only players who appear in at least one of the given games get a row.
+      .filter((r) => r.agg.games > 0)
+      .sort((a, b) => b.agg.acs - a.agg.acs);
   }, [players, games, filters, includeSubs, compareGames]);
 
   // Best value per column across player rows with games.
@@ -142,15 +168,39 @@ export default function PlayerStatsTable({
 
   return (
     <div className="card overflow-x-auto p-0">
-      <table className="w-full min-w-[900px]">
+      <table
+        // Sized to its content (no min width) with tight cell padding so it
+        // fits without sideways scrolling, including the half-width slot on
+        // the Win/Loss tabs. The outer edges keep a little breathing room.
+        className="w-full [&_td]:px-1 [&_th]:px-1 [&_td]:text-[13px] [&_th]:text-[10px] [&_th]:tracking-normal [&_td:first-child]:pl-3 [&_th:first-child]:pl-3 [&_td:last-child]:pr-3 [&_th:last-child]:pr-3"
+      >
         <thead className="bg-valorant-panel2/40">
           <tr>
             {COLUMNS.map((c) => (
               <th
                 key={c.key as string}
                 className={`table-head ${c.align === 'left' ? '' : 'text-right'}`}
+                title={c.tooltip}
               >
-                {c.label}
+                {c.key === 'name' && onSelectPlayer ? (
+                  <span className="inline-flex items-center gap-2">
+                    {c.label}
+                    <button
+                      type="button"
+                      onClick={() => onSelectPlayer(null)}
+                      className={
+                        selectedPlayerId
+                          ? 'text-valorant-muted hover:text-yellow-300'
+                          : 'text-yellow-300'
+                      }
+                      title="Show every player"
+                    >
+                      Any
+                    </button>
+                  </span>
+                ) : (
+                  c.label
+                )}
               </th>
             ))}
           </tr>
@@ -168,13 +218,41 @@ export default function PlayerStatsTable({
               </td>
             ))}
           </tr>
-          {playerRows.map(({ player, agg, cmp }) => (
-            <tr key={player.id} className="border-t border-white/5">
+          {playerRows.map(({ player, agg, cmp }) => {
+            const selectable = !!onSelectPlayer && agg.games > 0;
+            const selected = selectable && selectedPlayerId === player.id;
+            return (
+            <tr
+              key={player.id}
+              onClick={
+                selectable
+                  ? () => onSelectPlayer(selected ? null : player.id)
+                  : undefined
+              }
+              title={
+                selectable
+                  ? selected
+                    ? 'Show every player'
+                    : `Filter to ${player.name}`
+                  : undefined
+              }
+              className={`border-t border-white/5 ${
+                selectable ? 'cursor-pointer transition-colors' : ''
+              } ${
+                selected
+                  ? 'bg-valorant-panel2/50'
+                  : selectable
+                    ? 'hover:bg-valorant-panel2/30'
+                    : ''
+              }`}
+            >
               <td className="table-cell">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">{player.name}</span>
+                  <span className={`font-medium ${selected ? 'text-yellow-300' : ''}`}>
+                    {player.name}
+                  </span>
                   {!player.isMainRoster && (
-                    <span className="text-xs uppercase tracking-wide text-valorant-muted px-1 py-0.5 rounded bg-white/5">
+                    <span className="text-[10px] uppercase tracking-wide text-valorant-muted px-1 py-0.5 rounded bg-white/5">
                       Sub
                     </span>
                   )}
@@ -206,7 +284,8 @@ export default function PlayerStatsTable({
                 );
               })}
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

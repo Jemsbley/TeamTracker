@@ -133,7 +133,7 @@ export default function OverallStatsTab({
         </div>
       )}
       <PlayerStatsTable
-        games={scopedGames}
+        games={filteredGames}
         players={scopedPlayers}
         filters={filters}
         includeSubs={includeSubs}

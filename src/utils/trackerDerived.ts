@@ -1,11 +1,12 @@
-import type { AbilityCasts, Game } from '../types';
+import type { AbilityCasts, Game, TradeCounts } from '../types';
 import { canonicalAgent } from './agentName';
 import { playerIdByAgent, resolveUsTeam } from './roundPct';
+import { ZERO_TRADES, computeTrades, type TimelineKill } from './trades';
 import { vlrMatchTotals, vlrRating, type VlrMatch } from './vlrRating';
 
 /**
  * Stats worked out from a stored tracker.gg match response rather than read
- * off its summary: the VLR rating, ability casts, and ADR / damage delta
+ * off its summary: the VLR rating, ability casts, trades, and ADR / damage delta
  * rebuilt from the per-round damage feed.
  *
  * The damage rebuild works around a tracker.gg bug where some matches report
@@ -36,6 +37,7 @@ export type TrackerPlayerDerived = {
   damageDelta: number;
   vlrRating: number | null;
   abilities: AbilityCasts | null;
+  trades: TradeCounts;
 };
 
 function str(v: unknown): string {
@@ -111,17 +113,23 @@ export function deriveTrackerPlayers(raw: unknown): Map<string, TrackerPlayerDer
     r.loadout[team] = (r.loadout[team] ?? 0) + num(s, 'loadoutValue');
     played.set(id, (played.get(id) ?? 0) + 1);
   }
+  const timeline: TimelineKill[] = [];
   for (const s of segs) {
     if (s.type !== 'player-round-kills') continue;
     const fd = (s.metadata?.finishingDamage ?? {}) as { damageType?: unknown };
     const t = Number(s.metadata?.roundTime);
-    roundOf(Number(s.attributes?.round)).kills.push({
+    const round = Number(s.attributes?.round);
+    const killer = str(s.attributes?.platformUserIdentifier);
+    const victim = str(s.attributes?.opponentPlatformUserIdentifier);
+    roundOf(round).kills.push({
       t_ms: Number.isFinite(t) ? t : 0,
-      killer: str(s.attributes?.platformUserIdentifier) || null,
-      victim: str(s.attributes?.opponentPlatformUserIdentifier),
+      killer: killer || null,
+      victim,
       spike: fd.damageType === 'Bomb',
     });
+    if (killer && victim && Number.isFinite(t)) timeline.push({ round, t, killer, victim });
   }
+  const trades = computeTrades(timeline, (id) => teamById.get(id));
   const nRounds = roundCount || vlrRounds.size;
   const vlrMatch: VlrMatch = {
     players: [...teamById.keys()].map((id) => {
@@ -164,6 +172,7 @@ export function deriveTrackerPlayers(raw: unknown): Map<string, TrackerPlayerDer
         c === undefined && q === undefined && e === undefined && x === undefined
           ? null
           : { c: c ?? 0, q: q ?? 0, e: e ?? 0, x: x ?? 0, rounds },
+      trades: trades.get(identifier) ?? { ...ZERO_TRADES },
     });
   }
   return out;
@@ -209,6 +218,7 @@ export function withTrackerDerived(game: Game): Game {
         ...(repair ? { adr: d.adr, damageDelta: d.damageDelta } : {}),
         ...(d.vlrRating !== null ? { vlrRating: d.vlrRating } : {}),
         ...(d.abilities ? { abilities: d.abilities } : {}),
+        trades: d.trades,
       };
     }),
   };
